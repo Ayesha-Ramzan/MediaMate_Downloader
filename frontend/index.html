@@ -711,6 +711,10 @@ select.input{cursor:pointer}
 </div>
 
 <script>
+// ─── BACKEND CONFIGURATION ───
+// Aapka live Hugging Face backend URL
+const backendUrl = "https://ayesha-ramzan-mediamate-downloader.hf.space";
+
 // ─── STATE ───
 const state = {
   convertFile: null,
@@ -804,13 +808,13 @@ function renderProgress(areaId, job, onDone) {
 
 function triggerBrowserDownload(jobId) {
   const a = document.createElement('a');
-  a.href = `/api/download-file/${jobId}`;
+  a.href = `${backendUrl}/api/download-file/${jobId}`;
   a.setAttribute('download', '');
   document.body.appendChild(a); a.click(); a.remove();
 }
 
 function listenProgress(jobId, areaId, onDone) {
-  const es = new EventSource(`/api/progress/${jobId}`);
+  const es = new EventSource(`${backendUrl}/api/progress/${jobId}`);
   es.onmessage = e => {
     const job = JSON.parse(e.data);
     renderProgress(areaId, job, onDone);
@@ -874,7 +878,7 @@ async function startConvert() {
   fd.append('rename', document.getElementById('c-rename').value);
   try {
     showToast('Starting conversion...','info',2000);
-    const res = await fetch('/api/convert', { method:'POST', body:fd });
+    const res = await fetch(`${backendUrl}/api/convert`, { method:'POST', body:fd });
     const data = await res.json();
     if (data.job_id) listenProgress(data.job_id, 'convert-progress-area');
     else showToast(data.detail || 'Error', 'error');
@@ -1000,7 +1004,7 @@ async function startBlurEnhance() {
 
   let res;
   try {
-    res = await fetch('/api/enhance', { method:'POST', body:fd });
+    res = await fetch(`${backendUrl}/api/enhance`, { method:'POST', body:fd });
     const data = await res.json();
     if (!res.ok) throw new Error(data.detail || 'Upload failed');
     state.blurJobId = data.job_id;
@@ -1010,7 +1014,7 @@ async function startBlurEnhance() {
   }
 
   // Now poll SSE progress
-  const es = new EventSource(`/api/progress/${state.blurJobId}`);
+  const es = new EventSource(`${backendUrl}/api/progress/${state.blurJobId}`);
   const startTime = Date.now();
 
   es.onmessage = e => {
@@ -1084,12 +1088,13 @@ function blurEnhanceDone(job) {
 function downloadEnhancedVideo() {
   if (!state.blurJobId) { showToast('No enhanced video available', 'error'); return; }
   const a = document.createElement('a');
-  a.href = `/api/download-file/${state.blurJobId}`;
+  a.href = `${backendUrl}/api/download-file/${state.blurJobId}`;
   a.setAttribute('download', '');
   document.body.appendChild(a); a.click(); a.remove();
   showToast('Downloading enhanced video...', 'success', 3000);
 }
 
+// ─── MISC ───
 function cancelBlurEnhance() {
   if (state.blurJobId) {
     apiFetch(`/api/cancel/${state.blurJobId}`, null, 'POST').catch(() => {});
@@ -1122,13 +1127,12 @@ function resetBlurEnhancer() {
   setBlurLabel('Uploading video...', 'Please wait');
 }
 
-// ─── MISC ───
 async function cancelJob(jobId) {
   try { await apiFetch(`/api/cancel/${jobId}`, null, 'POST'); showToast('Download cancelled', 'warning'); }
   catch(e) { showToast(e.message, 'error'); }
 }
 async function openFolder(path) {
-  try { await fetch(`/api/open-folder?path=${encodeURIComponent(path)}`); }
+  try { await fetch(`${backendUrl}/api/open-folder?path=${encodeURIComponent(path)}`); }
   catch(e) { showToast('Could not open folder', 'error'); }
 }
 function addHistory(job) { state.history.unshift(job); renderHistory(); }
@@ -1138,32 +1142,3 @@ function renderHistory() {
   list.innerHTML = state.history.map(j =>
     `<div class="history-item"><span class="history-icon">${{video:'🎬',audio:'🎵',convert:'🔄',playlist:'📋',images:'🖼️',enhance:'✨'}[j.type]||'📁'}</span>
      <div class="history-info"><div class="name">${escHtml(j.filename||'Download')}</div><div class="path">${escHtml(j.filepath||'')}</div></div>
-     <div class="history-actions">${j.filepath?`<button class="btn btn-secondary btn-sm" onclick="openFolder('${escHtml(j.filepath)}')">📂</button>`:''}</div></div>`
-  ).join('');
-}
-function clearHistory() { state.history = []; renderHistory(); showToast('History cleared', 'info'); }
-function openSettings() { document.getElementById('settings-modal').classList.add('show'); }
-function closeSettings() { document.getElementById('settings-modal').classList.remove('show'); }
-document.getElementById('settings-modal').addEventListener('click', e => { if (e.target === document.getElementById('settings-modal')) closeSettings(); });
-async function updateYtdlp() {
-  const btn = document.getElementById('update-btn'); btn.textContent = '⏳ Updating...'; btn.disabled = true;
-  try { const res = await apiFetch('/api/update-ytdlp', null, 'POST'); showToast(res.message, 'success', 5000); }
-  catch(e) { showToast(e.message, 'error'); }
-  finally { btn.textContent = '⬆️ Update yt-dlp'; btn.disabled = false; }
-}
-async function fetchAppInfo() {
-  try { const data = await apiFetch('/api/info', null, 'GET'); document.getElementById('app-info').innerHTML = `MediaMate v${data.version} · yt-dlp ${data.ytdlp_version} · ${data.platform}<br>📂 ${data.base_dir}`; }
-  catch {}
-}
-function formatDuration(s) { if (!s) return ''; const m = Math.floor(s/60), sec = s%60; return m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}:${String(sec).padStart(2,'0')}`; }
-async function apiFetch(path, body=null, method=null) {
-  const opts = { method:method||(body?'POST':'GET'), headers:body&&!(body instanceof FormData)?{'Content-Type':'application/json'}:{}, body:body&&!(body instanceof FormData)?JSON.stringify(body):body };
-  const res = await fetch(path, opts);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || data.message || 'Request failed');
-  return data;
-}
-function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-</script>
-</body>
-</html>~

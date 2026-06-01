@@ -542,7 +542,180 @@ def update_ytdlp():
     except Exception as e:
         raise HTTPException(500, str(e))
 
+# ─── REAL VIDEO ENHANCEMENT ENDPOINT ───
+@app.post("/api/enhance")
+async def enhance_video(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    level: str = Form("medium"),
+    resolution: str = Form("auto"),
+    output_format: str = Form("mp4"),
+    keep_original: str = Form("1"),
+):
+    job_id = create_job("enhance")
+
+    # Save uploaded file to a temp location
+    upload_dir = BASE_DIR / "Uploads"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    suffix = Path(file.filename).suffix or ".mp4"
+    input_path = upload_dir / f"{job_id}_input{suffix}"
+
+    with open(input_path, "wb") as f:
+        f.write(await file.read())
+
+    # Determine output path
+    stem = Path(file.filename).stem
+    out_filename = f"{stem}_enhanced.{output_format}"
+    out_path = VIDEOS_DIR / out_filename
+    # Prevent overwrite
+    counter = 1
+    while out_path.exists():
+        out_path = VIDEOS_DIR / f"{stem}_enhanced_{counter}.{output_format}"
+        counter += 1
+
+    update_job(job_id, message="Starting enhancement...", filename=out_path.name, filepath=str(out_path))
+    background_tasks.add_task(
+        _enhance_worker, job_id, str(input_path), str(out_path),
+        level, resolution, output_format, keep_original == "1"
+    )
+    return {"job_id": job_id}
+
+
+def _enhance_worker(job_id, input_path, out_path, level, resolution, output_format, keep_original):
+    """Real FFmpeg enhancement — sharpening + denoise + upscale. No cartoonish AI effects."""
+    try:
+        # ── 1. Get video duration via ffprobe ──
+        probe = subprocess.run(
+            ["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1",
+             input_path],
+            capture_output=True, text=True
+        )
+        try:
+            total_duration = float(probe.stdout.strip())
+        except:
+            total_duration = 0
+
+        update_job(job_id, status="enhancing", progress=2, message="Building FFmpeg filter chain...")
+
+        # ── 2. Build filter chain (natural, not cartoonish) ──
+        # Sharpening levels — unsharp mask (safe, film-like)
+        sharpen_map = {
+            "light":  "unsharp=3:3:0.5:3:3:0.0",
+            "medium": "unsharp=5:5:1.0:5:5:0.0",
+            "strong": "unsharp=7:7:1.5:7:7:0.0",
+        }
+        # Denoise levels — hqdn3d (3D denoise, natural output)
+        denoise_map = {
+            "light":  "hqdn3d=1:1:3:3",
+            "medium": "hqdn3d=2:2:5:5",
+            "strong": "hqdn3d=4:4:8:8",
+        }
+        sharpen  = sharpen_map.get(level, sharpen_map["medium"])
+        denoise  = denoise_map.get(level, denoise_map["medium"])
+
+        # Scale filter with Lanczos (clean, film-like upscaling — not bicubic which blurs)
+        if resolution == "720p":
+            scale = "scale=1280:720:flags=lanczos:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2"
+        elif resolution == "1080p":
+            scale = "scale=1920:1080:flags=lanczos:force_original_aspect_ratio=decrease,pad=1920:1080:(ow-iw)/2:(oh-ih)/2"
+        elif resolution == "auto":
+            # Scale up if smaller than 720p, keep if already bigger
+            scale = "scale=iw*2:ih*2:flags=lanczos,scale='if(gt(iw,1280),1280,iw)':'if(gt(ih,720),720,ih)':flags=lanczos"
+        else:
+            scale = None  # original size
+
+        # Combine filters: denoise → sharpen → scale (order matters!)
+        filters = [denoise, sharpen]
+        if scale:
+            filters.append(scale)
+        vf = ",".join(filters)
+
+        # ── 3. Build FFmpeg command ──
+        # -crf 17 = near lossless quality, -preset slow = better compression quality
+        # -tune film = natural film-like output (not animation/cartoon)
+        cmd = [
+            "ffmpeg", "-y",
+            "-i", input_path,
+            "-vf", vf,
+            "-c:v", "libx264",
+            "-crf", "17",
+            "-preset", "slow",
+            "-tune", "film",
+            "-c:a", "aac",
+            "-b:a", "192k",
+            "-movflags", "+faststart",
+            "-progress", "pipe:1",
+            "-nostats",
+            out_path,
+        ]
+
+        update_job(job_id, status="enhancing", progress=5, message="FFmpeg processing started...")
+
+        # ── 4. Run FFmpeg & parse real-time progress ──
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+
+        current_time = 0.0
+        for line in proc.stdout:
+            line = line.strip()
+            if line.startswith("out_time_ms="):
+                try:
+                    ms = int(line.split("=")[1])
+                    current_time = ms / 1_000_000.0  # microseconds → seconds
+                    if total_duration > 0:
+                        pct = min(95, round(current_time / total_duration * 95, 1))
+                        update_job(job_id,
+                            status="enhancing",
+                            progress=pct,
+                            message=f"Enhancing... {pct:.0f}%",
+                            speed=f"{current_time:.1f}s processed",
+                            eta=f"~{max(0, int(total_duration - current_time))}s left"
+                        )
+                except:
+                    pass
+            elif line.startswith("speed="):
+                try:
+                    spd = line.split("=")[1].strip()
+                    update_job(job_id, speed=spd)
+                except:
+                    pass
+
+        proc.wait()
+
+        if proc.returncode != 0:
+            err = proc.stderr.read()[-300:] if proc.stderr else "FFmpeg error"
+            update_job(job_id, status="error", error=err)
+            return
+
+        # ── 5. Clean up original upload if not keeping ──
+        if not keep_original:
+            try:
+                Path(input_path).unlink(missing_ok=True)
+            except:
+                pass
+
+        out_file = Path(out_path)
+        update_job(job_id,
+            status="done",
+            progress=100,
+            message="Enhancement complete!",
+            filename=out_file.name,
+            filepath=str(out_file),
+            speed="",
+            eta="",
+        )
+
+    except Exception as e:
+        update_job(job_id, status="error", error=str(e))
+
+
 # Serve frontend
 frontend_path = Path(__file__).parent / "frontend"
 if frontend_path.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="static")
+    app.mount("/", StaticFiles(directory=str(frontend_path), html=True), name="static")

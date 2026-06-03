@@ -1,1176 +1,2496 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>MediaMate Downloader</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Outfit:wght@300;400;500;600;700&display=swap"/>
-<style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{
-  --bg:#f2ede8;--bg2:#ece7e1;--surface:#ffffff;--surface2:#f7f4f1;--surface3:#ede9e4;
-  --border:#ddd8d2;--border2:#c8c2bb;--accent:#4a8c7a;--accent-glow:rgba(74,140,122,0.14);
-  --accent2:#3a7a65;--accent3:#c0533a;--accent4:#8a6f3e;--accent5:#5a7a8c;
-  --text:#1e2622;--text2:#4a5c54;--text3:#8a9e96;--sidebar:270px;--radius:12px;
-  --shadow:0 4px 24px rgba(30,38,34,0.10);--font-display:'Cormorant Garamond',serif;--font-body:'Outfit',sans-serif;
-}
-.dark-mode{
-  --bg:#181818;--bg2:#121212;--surface:#222222;--surface2:#2a2a2a;--surface3:#333333;
-  --border:#383838;--border2:#484848;--accent:#7ec8b8;--accent-glow:rgba(126,200,184,0.15);
-  --accent2:#6ab8a4;--accent3:#e07060;--accent4:#c8a860;--text:#f0eeec;--text2:#a8a8a8;--text3:#686868;
-}
-body{font-family:var(--font-body);background:var(--bg);color:var(--text);min-height:100vh;display:flex;transition:background .3s,color .3s;overflow-x:hidden}
-a{color:var(--accent);text-decoration:none}
-input,select,textarea,button{font-family:var(--font-body)}
-button{cursor:pointer}
-::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:var(--bg)}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}::-webkit-scrollbar-thumb:hover{background:var(--accent)}
-body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;background:radial-gradient(ellipse 700px 500px at 0% 0%, rgba(74,140,122,0.06) 0%, transparent 70%),radial-gradient(ellipse 500px 400px at 100% 100%, rgba(74,140,122,0.04) 0%, transparent 70%);}
-#sidebar,#main{position:relative;z-index:1}
-#sidebar{width:var(--sidebar);min-width:var(--sidebar);height:100vh;position:sticky;top:0;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:width .3s,min-width .3s;overflow:hidden;z-index:100;}
-#sidebar.collapsed{width:64px;min-width:64px}
-.sidebar-header{padding:22px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);background:var(--surface);}
-.logo-icon{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;background:linear-gradient(135deg,#4a8c7a 0%,#3a6e5e 100%);box-shadow:0 4px 14px rgba(74,140,122,0.25);}
-.logo-text{font-family:var(--font-display);font-size:17px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;opacity:1;transition:opacity .3s;letter-spacing:0.2px}
-.logo-sub{font-size:10px;color:var(--text3);font-weight:400;margin-top:1px;font-family:var(--font-body);letter-spacing:0.8px;text-transform:uppercase}
-#sidebar.collapsed .logo-text,#sidebar.collapsed .logo-sub{opacity:0;width:0}
-.nav{flex:1;padding:14px 10px;display:flex;flex-direction:column;gap:3px;overflow-y:auto}
-.nav-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;cursor:pointer;transition:all .2s;position:relative;border:none;background:none;color:var(--text2);text-align:left;width:100%;white-space:nowrap;}
-.nav-item:hover{background:var(--surface2);color:var(--text)}
-.nav-item.active{background:var(--accent-glow);color:var(--accent);border:1px solid rgba(74,140,122,0.2)}
-.nav-item .nav-icon{font-size:19px;flex-shrink:0;width:22px;text-align:center}
-.nav-item .nav-label{font-size:13px;font-weight:500;overflow:hidden;opacity:1;transition:opacity .3s;font-family:var(--font-body)}
-.nav-item .nav-badge{margin-left:auto;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;background:linear-gradient(135deg,#4a8c7a,#3a6e5e);color:#fff;letter-spacing:.5px;flex-shrink:0;}
-#sidebar.collapsed .nav-label,#sidebar.collapsed .nav-badge{opacity:0;width:0}
-.sidebar-footer{padding:12px 10px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:3px}
-.version-text{padding:6px 12px;font-size:10px;color:var(--text3);white-space:nowrap;overflow:hidden;opacity:1;transition:opacity .3s;font-family:var(--font-body);letter-spacing:0.5px}
-#sidebar.collapsed .version-text{opacity:0}
-.nav-section-label{padding:6px 12px 3px;font-size:10px;font-weight:600;color:var(--text3);letter-spacing:1.5px;text-transform:uppercase;white-space:nowrap;overflow:hidden;opacity:1;transition:opacity .3s;font-family:var(--font-body)}
-#sidebar.collapsed .nav-section-label{opacity:0}
-#main{flex:1;display:flex;flex-direction:column;overflow-y:auto;min-width:0}
-.topbar{position:sticky;top:0;z-index:50;background:rgba(242,237,232,0.90);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;}
-.dark-mode .topbar{background:rgba(20,28,26,0.90)}
-.topbar-title{font-family:var(--font-display);font-size:18px;font-weight:600;color:var(--text);letter-spacing:0.1px}
-.topbar-actions{display:flex;gap:8px;align-items:center}
-.content{padding:28px;max-width:920px;width:100%;margin:0 auto}
-.tab-panel{display:none}.tab-panel.active{display:block}
-.btn{display:inline-flex;align-items:center;gap:8px;padding:9px 18px;border-radius:9px;font-size:13.5px;font-weight:500;border:none;transition:all .2s;cursor:pointer;font-family:var(--font-body);letter-spacing:0.2px}
-.btn-primary{background:linear-gradient(135deg,#4a8c7a 0%,#3a6e5e 100%);color:#fff;box-shadow:0 4px 16px rgba(74,140,122,0.28);}
-.btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 24px rgba(74,140,122,0.4)}
-.btn-primary:active{transform:translateY(0)}
-.btn-success{background:linear-gradient(135deg,#3a7a65,#2a5e50);color:#fff;box-shadow:0 4px 14px rgba(58,122,101,0.25)}
-.btn-success:hover{transform:translateY(-1px)}
-.btn-danger{background:var(--accent3);color:#fff}.btn-danger:hover{background:#ff6b6b}
-.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}.btn-secondary:hover{background:var(--surface3);border-color:var(--border2)}
-.btn-sm{padding:6px 12px;font-size:12px;border-radius:7px}
-.btn-icon{padding:8px;border-radius:9px;background:var(--surface2);color:var(--text2);border:1px solid var(--border);font-size:16px;line-height:1;}
-.btn-icon:hover{color:var(--text);background:var(--surface3);border-color:var(--border2)}
-.btn-download{background:linear-gradient(135deg,#2a7a5a,#1a5e42);color:#fff;box-shadow:0 4px 20px rgba(42,122,90,0.35);font-size:15px;padding:13px 32px;border-radius:12px;border:none;font-weight:600;letter-spacing:0.3px;}
-.btn-download:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(42,122,90,0.5)}
-.btn-download:active{transform:translateY(0)}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;margin-bottom:18px;transition:border-color .2s}
-.card:hover{border-color:var(--border2)}
-.card-title{font-size:11px;font-weight:600;color:var(--text2);margin-bottom:16px;display:flex;align-items:center;gap:8px;text-transform:uppercase;letter-spacing:1.2px;font-family:var(--font-body)}
-.card-title span{font-size:16px}
-.field{margin-bottom:14px}
-.field label{display:block;font-size:11px;color:var(--text2);margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.8px;font-family:var(--font-body)}
-.input{width:100%;background:var(--surface2);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:9px;font-size:13.5px;outline:none;transition:all .2s;font-family:var(--font-body);}
-.input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
-.input::placeholder{color:var(--text3)}
-select.input{cursor:pointer}
-.input-row{display:flex;gap:12px;align-items:flex-end}
-.input-row .input{flex:1}
-.url-item{display:flex;gap:8px;margin-bottom:10px;animation:slideIn .2s ease}
-.url-item .input{flex:1}
-@keyframes slideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
-.progress-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:12px}
-.progress-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:13px;font-family:var(--font-body)}
-.progress-bar-wrap{background:var(--surface2);border-radius:99px;height:6px;overflow:hidden}
-.progress-bar{height:100%;border-radius:99px;transition:width .4s ease;background:linear-gradient(90deg,#4a8c7a,#3a6e5e)}
-.progress-bar.done{background:linear-gradient(90deg,#3a7a65,#2a5e50)}
-.progress-bar.error{background:var(--accent3)}
-.progress-bar.enhancing{background:linear-gradient(90deg,#4a8c7a,#6ab8a4,#3a6e5e);background-size:200% 100%;animation:shimmerBar 1.5s linear infinite}
-@keyframes shimmerBar{0%{background-position:100% 0}100%{background-position:-100% 0}}
-.progress-meta{display:flex;gap:16px;margin-top:8px;font-size:11.5px;color:var(--text2);font-family:var(--font-body)}
-.status-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border-radius:99px;font-size:11px;font-weight:600;letter-spacing:.3px;font-family:var(--font-body)}
-.badge-waiting{background:rgba(139,148,158,.12);color:var(--text2)}
-.badge-downloading{background:rgba(74,140,122,.15);color:var(--accent)}
-.badge-processing{background:rgba(245,197,66,.15);color:var(--accent4)}
-.badge-enhancing{background:rgba(74,140,122,.15);color:var(--accent)}
-.badge-done{background:rgba(58,122,101,.15);color:var(--accent2)}
-.badge-error{background:rgba(247,95,79,.15);color:var(--accent3)}
-.badge-cancelled{background:rgba(139,148,158,.12);color:var(--text2)}
-.toggle-wrap{display:flex;align-items:center;gap:10px;cursor:pointer}
-.toggle{position:relative;width:44px;height:24px;flex-shrink:0}
-.toggle input{opacity:0;width:0;height:0;position:absolute}
-.toggle-track{position:absolute;inset:0;background:var(--surface2);border:1px solid var(--border);border-radius:99px;transition:.2s}
-.toggle input:checked~.toggle-track{background:var(--accent);border-color:var(--accent)}
-.toggle-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;background:#fff;border-radius:50%;transition:.2s}
-.toggle input:checked~.toggle-track~.toggle-thumb,.toggle input:checked+.toggle-track+.toggle-thumb{left:23px}
-.thumb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:12px}
-.thumb-item{position:relative;cursor:pointer;border-radius:10px;overflow:hidden;border:2px solid transparent;transition:.2s}
-.thumb-item:hover{border-color:var(--accent)}
-.thumb-item.selected{border-color:var(--accent2)}
-.thumb-item img{width:100%;height:100px;object-fit:cover;display:block;background:var(--border)}
-.thumb-item .thumb-check{position:absolute;top:6px;right:6px;width:20px;height:20px;background:var(--accent2);border-radius:50%;display:none;align-items:center;justify-content:center;font-size:12px;color:#fff}
-.thumb-item.selected .thumb-check{display:flex}
-.thumb-item .thumb-info{padding:6px;font-size:11px;color:var(--text2);background:var(--surface);font-family:var(--font-body)}
-.dropzone{border:2px dashed var(--border);border-radius:var(--radius);padding:44px;text-align:center;cursor:pointer;transition:.2s;color:var(--text2);background:var(--surface2);}
-.dropzone:hover,.dropzone.dragover{border-color:var(--accent);background:var(--accent-glow)}
-.dropzone .drop-icon{font-size:44px;margin-bottom:14px;filter:drop-shadow(0 0 10px rgba(79,142,247,0.3))}
-.dropzone p{font-size:14px;font-weight:500;font-family:var(--font-body)}
-.dropzone .drop-note{font-size:12px;color:var(--text3);margin-top:6px;font-family:var(--font-body)}
-#toasts{position:fixed;top:18px;right:18px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none}
-.toast{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 18px;display:flex;align-items:center;gap:10px;min-width:270px;max-width:400px;box-shadow:var(--shadow);pointer-events:all;animation:toastIn .25s ease;font-size:13.5px;font-family:var(--font-body);}
-.toast.removing{animation:toastOut .25s ease forwards}
-@keyframes toastIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
-@keyframes toastOut{to{opacity:0;transform:translateX(20px)}}
-.toast-icon{font-size:18px;flex-shrink:0}
-.toast.success{border-left:3px solid var(--accent2)}
-.toast.error{border-left:3px solid var(--accent3)}
-.toast.info{border-left:3px solid var(--accent)}
-.toast.warning{border-left:3px solid var(--accent4)}
-.history-item{display:flex;align-items:center;gap:12px;padding:14px;border-bottom:1px solid var(--border);font-size:13px;transition:background .15s;font-family:var(--font-body)}
-.history-item:hover{background:var(--surface2)}
-.history-item:last-child{border-bottom:none}
-.history-icon{font-size:20px}
-.history-info{flex:1;min-width:0}
-.history-info .name{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.history-info .path{font-size:11px;color:var(--text2);margin-top:2px}
-.history-actions{display:flex;gap:6px}
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
-.modal-overlay.show{display:flex}
-.modal{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:28px;width:480px;max-width:90vw;max-height:85vh;overflow-y:auto;box-shadow:var(--shadow)}
-.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:22px}
-.modal-header h3{font-family:var(--font-display);font-size:22px;font-weight:600;letter-spacing:0.2px}
-.modal-section{margin-bottom:22px}
-.modal-section h4{font-size:10px;color:var(--text3);font-weight:600;margin-bottom:12px;text-transform:uppercase;letter-spacing:1.5px;font-family:var(--font-body)}
-.modal-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-size:13.5px;font-family:var(--font-body)}
-.playlist-video-item{display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid var(--border);cursor:pointer;transition:background .15s}
-.playlist-video-item:hover{background:var(--surface2)}
-.playlist-video-item img{width:80px;height:45px;object-fit:cover;border-radius:6px;background:var(--border);flex-shrink:0}
-.playlist-video-item .pv-info{flex:1;min-width:0}
-.playlist-video-item .pv-title{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--font-body)}
-.playlist-video-item .pv-dur{font-size:11px;color:var(--text2);font-family:var(--font-body)}
-.playlist-count-info{font-size:13px;color:var(--text2);margin-bottom:12px;font-family:var(--font-body)}
-.section-header{font-family:var(--font-display);font-size:32px;font-weight:700;margin-bottom:8px;color:var(--text);line-height:1.2;letter-spacing:0.2px}
-.section-sub{font-size:14px;color:var(--text2);margin-bottom:26px;line-height:1.75;font-family:var(--font-body);font-weight:400;letter-spacing:0.1px}
-.divider{height:1px;background:var(--border);margin:20px 0}
-.check-wrap{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13.5px;font-family:var(--font-body)}
-.check-wrap input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);cursor:pointer}
-.spinner{width:16px;height:16px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;display:inline-block}
-@keyframes spin{to{transform:rotate(360deg)}}
-#hamburger{display:none;position:fixed;top:14px;left:14px;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:10px;width:42px;height:42px;align-items:center;justify-content:center;font-size:18px;cursor:pointer}
-#sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:90;backdrop-filter:blur(3px)}
-@media(max-width:768px){
-  #hamburger{display:flex}
-  #sidebar{position:fixed;left:-290px;height:100vh;transition:left .3s;z-index:100;width:270px!important;min-width:270px!important}
-  #sidebar.mobile-open{left:0}
-  #sidebar.collapsed{width:270px!important;min-width:270px!important}
-  #sidebar.collapsed .logo-text,#sidebar.collapsed .nav-label,#sidebar.collapsed .version-text,#sidebar.collapsed .nav-badge,#sidebar.collapsed .nav-section-label{opacity:1;width:auto}
-  #sidebar-overlay.show{display:block}
-  .topbar{padding:12px 16px;padding-left:62px}
-  .content{padding:16px}
-  .input-row{flex-direction:column}
-  .thumb-grid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
-  #sidebar.collapsed .nav-item .nav-label{opacity:1;width:auto}
-}
-.enhance-dropzone{border:2px dashed var(--border);border-radius:16px;padding:60px 40px;text-align:center;cursor:pointer;transition:.3s;background:linear-gradient(135deg,rgba(74,140,122,0.04),rgba(58,110,94,0.04));position:relative;overflow:hidden;}
-.enhance-dropzone::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse 300px 200px at 50% 0%,rgba(74,140,122,0.06),transparent);pointer-events:none;}
-.enhance-dropzone:hover,.enhance-dropzone.dragover{border-color:var(--accent);background:linear-gradient(135deg,rgba(74,140,122,0.08),rgba(58,110,94,0.06));}
-.enhance-drop-icon{font-size:52px;margin-bottom:16px;display:block}
-.quality-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:99px;font-size:12px;font-weight:600;margin:4px;font-family:var(--font-body)}
-.badge-before{background:rgba(192,83,58,.12);color:var(--accent3)}
-.badge-after{background:rgba(58,122,101,.12);color:var(--accent2)}
-.ring-wrap{position:relative;width:100px;height:100px;margin:0 auto 20px}
-.ring-bg{fill:none;stroke:var(--surface2);stroke-width:8}
-.ring-fill{fill:none;stroke-width:8;stroke-linecap:round;transform-origin:50% 50%;transform:rotate(-90deg);stroke:url(#ringGrad);stroke-dasharray:283;stroke-dashoffset:283;transition:stroke-dashoffset .6s ease;}
-.ring-text{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:22px;font-weight:700;font-family:var(--font-display);color:var(--accent)}
-.ring-sub{font-size:10px;color:var(--text2);font-weight:400;font-family:var(--font-body);letter-spacing:0.5px}
-.section-header{font-family:var(--font-display);font-size:32px;font-weight:700;margin-bottom:8px;color:var(--text);line-height:1.2;letter-spacing:0.2px}
-.hero-accent{background:linear-gradient(135deg,rgba(74,140,122,0.07),rgba(58,110,94,0.05));border:1px solid rgba(74,140,122,0.18);border-radius:16px;padding:28px;margin-bottom:28px;position:relative;overflow:hidden;}
-.hero-accent::after{content:'';position:absolute;top:-40px;right:-40px;width:200px;height:200px;background:radial-gradient(ellipse,rgba(74,140,122,0.08),transparent 70%);pointer-events:none;}
-.tab-panel.active{animation:fadeUp .3s ease}
-@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-.home-hero{text-align:center;padding:72px 20px 56px;border-bottom:1px solid var(--border);margin-bottom:48px;position:relative;}
-.home-wave{font-size:52px;margin-bottom:20px;display:block;animation:wave 2.5s ease-in-out infinite}
-@keyframes wave{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(15deg)}}
-.home-headline{font-family:var(--font-display);font-size:56px;font-weight:700;line-height:1.1;margin-bottom:18px;color:var(--text);letter-spacing:0.3px;}
-.home-name{color:var(--accent);position:relative;font-style:italic;}
-.home-name::after{content:'';position:absolute;bottom:-4px;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),transparent);border-radius:2px;opacity:0.5}
-.home-tagline{font-family:var(--font-display);font-size:20px;color:var(--text2);margin-bottom:14px;font-weight:400;font-style:italic;letter-spacing:0.2px;line-height:1.6;}
-.home-intro{font-family:var(--font-body);font-size:15px;color:var(--text2);max-width:520px;margin:0 auto 42px;line-height:1.85;font-weight:400;letter-spacing:0.1px;}
-.home-cta-wrap{display:flex;flex-direction:column;align-items:center;gap:16px}
-.home-cta-question{font-family:var(--font-display);font-size:26px;font-weight:600;color:var(--text);letter-spacing:0.2px;font-style:italic;}
-.home-cta-btn{padding:14px 48px;font-size:15px;border-radius:50px;letter-spacing:0.4px;font-weight:600}
-.home-features-title{font-family:var(--font-display);font-size:26px;font-weight:600;color:var(--text);margin-bottom:24px;padding-left:2px;letter-spacing:0.2px;}
-.home-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px;margin-bottom:28px;}
-.home-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:26px;cursor:pointer;transition:all .22s;position:relative;overflow:hidden;}
-.home-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,var(--accent),transparent);opacity:0;transition:opacity .22s;}
-.home-card:hover{border-color:var(--accent);transform:translateY(-3px);box-shadow:0 8px 28px rgba(74,140,122,0.12)}
-.home-card:hover::before{opacity:1}
-.home-card-icon{font-size:30px;margin-bottom:14px;display:block}
-.home-card-title{font-family:var(--font-display);font-size:18px;font-weight:600;color:var(--text);margin-bottom:10px;line-height:1.3;letter-spacing:0.1px;}
-.home-card-desc{font-size:13.5px;color:var(--text2);line-height:1.75;margin-bottom:16px;font-family:var(--font-body);font-weight:400;letter-spacing:0.1px;}
-.home-card-tag{display:inline-flex;align-items:center;font-size:10px;font-weight:600;color:var(--accent);background:var(--accent-glow);padding:3px 10px;border-radius:99px;letter-spacing:0.8px;font-family:var(--font-body);text-transform:uppercase;}
-.new-tag{color:var(--surface);background:var(--accent)}
 
-/* ── ENHANCE RESULT BOX ── */
-.enhance-result-box{
-  display:none;
-  background:linear-gradient(135deg,rgba(42,122,90,0.08),rgba(58,140,100,0.05));
-  border:1.5px solid rgba(58,122,101,0.3);
-  border-radius:16px;
-  padding:32px 28px;
-  text-align:center;
-  margin-top:20px;
-  animation:fadeUp .4s ease;
-}
-.enhance-result-box.show{display:block}
-.enhance-result-box .result-icon{font-size:52px;margin-bottom:12px;display:block;animation:pop .4s cubic-bezier(.34,1.56,.64,1)}
-@keyframes pop{from{transform:scale(0.5);opacity:0}to{transform:scale(1);opacity:1}}
-.enhance-result-box .result-title{font-family:var(--font-display);font-size:28px;font-weight:700;color:var(--accent2);margin-bottom:6px;letter-spacing:0.2px;}
-.enhance-result-box .result-sub{font-size:13.5px;color:var(--text2);margin-bottom:24px;line-height:1.7;font-family:var(--font-body);}
-.enhance-result-box .result-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-.enhance-processing-box{
-  display:none;
-  background:var(--surface);
-  border:1px solid var(--border);
-  border-radius:16px;
-  padding:32px 28px;
-  margin-top:20px;
-}
-.enhance-processing-box.show{display:block}
-@media(max-width:700px){.home-headline{font-size:36px}}
-</style>
+<!-- ============================================================
+     MediaMate Downloader  —  v2.0.0
+     Frontend: HTML + CSS + Vanilla JS
+     Backend:  FastAPI (app.py)  |  Port 7860
+     ============================================================ -->
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediaMate Downloader</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Outfit:wght@300;400;500;600;700&display=swap" />
+
+  <style>
+
+    /* ─────────────────────────────────────────────
+       RESET
+    ───────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* ─────────────────────────────────────────────
+       CSS VARIABLES  —  Light Mode
+    ───────────────────────────────────────────── */
+    :root {
+      --bg:           #f2ede8;
+      --bg2:          #ece7e1;
+      --surface:      #ffffff;
+      --surface2:     #f7f4f1;
+      --surface3:     #ede9e4;
+      --border:       #ddd8d2;
+      --border2:      #c8c2bb;
+
+      --accent:       #4a8c7a;
+      --accent-glow:  rgba(74, 140, 122, 0.14);
+      --accent2:      #3a7a65;
+      --accent3:      #c0533a;
+      --accent4:      #8a6f3e;
+      --accent5:      #5a7a8c;
+
+      --text:         #1e2622;
+      --text2:        #4a5c54;
+      --text3:        #8a9e96;
+
+      --sidebar:      270px;
+      --radius:       12px;
+      --shadow:       0 4px 24px rgba(30, 38, 34, 0.10);
+
+      --font-display: 'Cormorant Garamond', serif;
+      --font-body:    'Outfit', sans-serif;
+    }
+
+    /* ─────────────────────────────────────────────
+       CSS VARIABLES  —  Dark Mode
+    ───────────────────────────────────────────── */
+    .dark-mode {
+      --bg:          #181818;
+      --bg2:         #121212;
+      --surface:     #222222;
+      --surface2:    #2a2a2a;
+      --surface3:    #333333;
+      --border:      #383838;
+      --border2:     #484848;
+      --accent:      #7ec8b8;
+      --accent-glow: rgba(126, 200, 184, 0.15);
+      --accent2:     #6ab8a4;
+      --accent3:     #e07060;
+      --accent4:     #c8a860;
+      --text:        #f0eeec;
+      --text2:       #a8a8a8;
+      --text3:       #686868;
+    }
+
+    /* ─────────────────────────────────────────────
+       BASE
+    ───────────────────────────────────────────── */
+    body {
+      font-family: var(--font-body);
+      background:  var(--bg);
+      color:       var(--text);
+      min-height:  100vh;
+      display:     flex;
+      transition:  background .3s, color .3s;
+      overflow-x:  hidden;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+
+    input, select, textarea, button { font-family: var(--font-body); }
+    button { cursor: pointer; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar       { width: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+    /* Background glow */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      background:
+        radial-gradient(ellipse 700px 500px at 0% 0%,   rgba(74,140,122,0.06) 0%, transparent 70%),
+        radial-gradient(ellipse 500px 400px at 100% 100%, rgba(74,140,122,0.04) 0%, transparent 70%);
+    }
+
+    #sidebar, #main { position: relative; z-index: 1; }
+
+    /* ─────────────────────────────────────────────
+       SIDEBAR
+    ───────────────────────────────────────────── */
+    #sidebar {
+      width:      var(--sidebar);
+      min-width:  var(--sidebar);
+      height:     100vh;
+      position:   sticky;
+      top:        0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display:    flex;
+      flex-direction: column;
+      transition: width .3s, min-width .3s;
+      overflow:   hidden;
+      z-index:    100;
+    }
+    #sidebar.collapsed { width: 64px; min-width: 64px; }
+
+    /* Sidebar header */
+    .sidebar-header {
+      padding:       22px 18px;
+      display:       flex;
+      align-items:   center;
+      gap:           12px;
+      border-bottom: 1px solid var(--border);
+      background:    var(--surface);
+    }
+
+    .logo-icon {
+      width:       38px;
+      height:      38px;
+      border-radius: 10px;
+      display:     flex;
+      align-items: center;
+      justify-content: center;
+      font-size:   20px;
+      flex-shrink: 0;
+      background:  linear-gradient(135deg, #4a8c7a 0%, #3a6e5e 100%);
+      box-shadow:  0 4px 14px rgba(74, 140, 122, 0.25);
+    }
+
+    .logo-text {
+      font-family:  var(--font-display);
+      font-size:    17px;
+      font-weight:  700;
+      color:        var(--text);
+      white-space:  nowrap;
+      overflow:     hidden;
+      opacity:      1;
+      transition:   opacity .3s;
+      letter-spacing: 0.2px;
+    }
+
+    .logo-sub {
+      font-size:      10px;
+      color:          var(--text3);
+      font-weight:    400;
+      margin-top:     1px;
+      font-family:    var(--font-body);
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+
+    #sidebar.collapsed .logo-text,
+    #sidebar.collapsed .logo-sub { opacity: 0; width: 0; }
+
+    /* Nav */
+    .nav {
+      flex:       1;
+      padding:    14px 10px;
+      display:    flex;
+      flex-direction: column;
+      gap:        3px;
+      overflow-y: auto;
+    }
+
+    .nav-item {
+      display:     flex;
+      align-items: center;
+      gap:         12px;
+      padding:     10px 12px;
+      border-radius: 10px;
+      cursor:      pointer;
+      transition:  all .2s;
+      position:    relative;
+      border:      none;
+      background:  none;
+      color:       var(--text2);
+      text-align:  left;
+      width:       100%;
+      white-space: nowrap;
+    }
+    .nav-item:hover              { background: var(--surface2); color: var(--text); }
+    .nav-item.active             { background: var(--accent-glow); color: var(--accent); border: 1px solid rgba(74,140,122,0.2); }
+    .nav-item .nav-icon          { font-size: 19px; flex-shrink: 0; width: 22px; text-align: center; }
+    .nav-item .nav-label         { font-size: 13px; font-weight: 500; overflow: hidden; opacity: 1; transition: opacity .3s; font-family: var(--font-body); }
+    .nav-item .nav-badge         { margin-left: auto; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: linear-gradient(135deg,#4a8c7a,#3a6e5e); color: #fff; letter-spacing: .5px; flex-shrink: 0; }
+
+    #sidebar.collapsed .nav-label,
+    #sidebar.collapsed .nav-badge { opacity: 0; width: 0; }
+
+    /* Sidebar footer */
+    .sidebar-footer {
+      padding:       12px 10px;
+      border-top:    1px solid var(--border);
+      display:       flex;
+      flex-direction: column;
+      gap:           3px;
+    }
+
+    .version-text {
+      padding:        6px 12px;
+      font-size:      10px;
+      color:          var(--text3);
+      white-space:    nowrap;
+      overflow:       hidden;
+      opacity:        1;
+      transition:     opacity .3s;
+      font-family:    var(--font-body);
+      letter-spacing: 0.5px;
+    }
+    #sidebar.collapsed .version-text { opacity: 0; }
+
+    .nav-section-label {
+      padding:        6px 12px 3px;
+      font-size:      10px;
+      font-weight:    600;
+      color:          var(--text3);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      white-space:    nowrap;
+      overflow:       hidden;
+      opacity:        1;
+      transition:     opacity .3s;
+      font-family:    var(--font-body);
+    }
+    #sidebar.collapsed .nav-section-label { opacity: 0; }
+
+    /* ─────────────────────────────────────────────
+       MAIN AREA
+    ───────────────────────────────────────────── */
+    #main {
+      flex:       1;
+      display:    flex;
+      flex-direction: column;
+      overflow-y: auto;
+      min-width:  0;
+    }
+
+    /* Topbar */
+    .topbar {
+      position:      sticky;
+      top:           0;
+      z-index:       50;
+      background:    rgba(242, 237, 232, 0.90);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      padding:       14px 28px;
+      display:       flex;
+      align-items:   center;
+      justify-content: space-between;
+    }
+    .dark-mode .topbar { background: rgba(20, 28, 26, 0.90); }
+
+    .topbar-title   { font-family: var(--font-display); font-size: 18px; font-weight: 600; color: var(--text); letter-spacing: 0.1px; }
+    .topbar-actions { display: flex; gap: 8px; align-items: center; }
+
+    /* Content wrapper */
+    .content {
+      padding:   28px;
+      max-width: 920px;
+      width:     100%;
+      margin:    0 auto;
+    }
+
+    .tab-panel        { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ─────────────────────────────────────────────
+       BUTTONS
+    ───────────────────────────────────────────── */
+    .btn {
+      display:     inline-flex;
+      align-items: center;
+      gap:         8px;
+      padding:     9px 18px;
+      border-radius: 9px;
+      font-size:   13.5px;
+      font-weight: 500;
+      border:      none;
+      transition:  all .2s;
+      cursor:      pointer;
+      font-family: var(--font-body);
+      letter-spacing: 0.2px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #4a8c7a 0%, #3a6e5e 100%);
+      color:      #fff;
+      box-shadow: 0 4px 16px rgba(74, 140, 122, 0.28);
+    }
+    .btn-primary:hover  { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(74,140,122,0.4); }
+    .btn-primary:active { transform: translateY(0); }
+
+    .btn-success {
+      background: linear-gradient(135deg, #3a7a65, #2a5e50);
+      color:      #fff;
+      box-shadow: 0 4px 14px rgba(58,122,101,0.25);
+    }
+    .btn-success:hover { transform: translateY(-1px); }
+
+    .btn-danger  { background: var(--accent3); color: #fff; }
+    .btn-danger:hover { background: #ff6b6b; }
+
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:hover { background: var(--surface3); border-color: var(--border2); }
+
+    .btn-sm   { padding: 6px 12px; font-size: 12px; border-radius: 7px; }
+
+    .btn-icon {
+      padding:      8px;
+      border-radius: 9px;
+      background:   var(--surface2);
+      color:        var(--text2);
+      border:       1px solid var(--border);
+      font-size:    16px;
+      line-height:  1;
+    }
+    .btn-icon:hover { color: var(--text); background: var(--surface3); border-color: var(--border2); }
+
+    .btn-download {
+      background:  linear-gradient(135deg, #2a7a5a, #1a5e42);
+      color:       #fff;
+      box-shadow:  0 4px 20px rgba(42,122,90,0.35);
+      font-size:   15px;
+      padding:     13px 32px;
+      border-radius: 12px;
+      border:      none;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+    .btn-download:hover  { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(42,122,90,0.5); }
+    .btn-download:active { transform: translateY(0); }
+
+    /* ─────────────────────────────────────────────
+       CARDS
+    ───────────────────────────────────────────── */
+    .card {
+      background:    var(--surface);
+      border:        1px solid var(--border);
+      border-radius: var(--radius);
+      padding:       22px;
+      margin-bottom: 18px;
+      transition:    border-color .2s;
+    }
+    .card:hover { border-color: var(--border2); }
+
+    .card-title {
+      font-size:      11px;
+      font-weight:    600;
+      color:          var(--text2);
+      margin-bottom:  16px;
+      display:        flex;
+      align-items:    center;
+      gap:            8px;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      font-family:    var(--font-body);
+    }
+    .card-title span { font-size: 16px; }
+
+    /* ─────────────────────────────────────────────
+       FORM FIELDS
+    ───────────────────────────────────────────── */
+    .field       { margin-bottom: 14px; }
+    .field label { display: block; font-size: 11px; color: var(--text2); margin-bottom: 6px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.8px; font-family: var(--font-body); }
+
+    .input {
+      width:         100%;
+      background:    var(--surface2);
+      border:        1px solid var(--border);
+      color:         var(--text);
+      padding:       10px 14px;
+      border-radius: 9px;
+      font-size:     13.5px;
+      outline:       none;
+      transition:    all .2s;
+      font-family:   var(--font-body);
+    }
+    .input:focus       { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .input::placeholder { color: var(--text3); }
+    select.input       { cursor: pointer; }
+
+    .input-row             { display: flex; gap: 12px; align-items: flex-end; }
+    .input-row .input      { flex: 1; }
+
+    /* URL list items */
+    .url-item         { display: flex; gap: 8px; margin-bottom: 10px; animation: slideIn .2s ease; }
+    .url-item .input  { flex: 1; }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* ─────────────────────────────────────────────
+       PROGRESS
+    ───────────────────────────────────────────── */
+    .progress-card {
+      background:    var(--surface);
+      border:        1px solid var(--border);
+      border-radius: var(--radius);
+      padding:       18px;
+      margin-bottom: 12px;
+    }
+
+    .progress-header {
+      display:         flex;
+      justify-content: space-between;
+      align-items:     center;
+      margin-bottom:   10px;
+      font-size:       13px;
+      font-family:     var(--font-body);
+    }
+
+    .progress-bar-wrap {
+      background:    var(--surface2);
+      border-radius: 99px;
+      height:        6px;
+      overflow:      hidden;
+    }
+
+    .progress-bar {
+      height:        100%;
+      border-radius: 99px;
+      transition:    width .4s ease;
+      background:    linear-gradient(90deg, #4a8c7a, #3a6e5e);
+    }
+    .progress-bar.done      { background: linear-gradient(90deg, #3a7a65, #2a5e50); }
+    .progress-bar.error     { background: var(--accent3); }
+    .progress-bar.enhancing {
+      background:      linear-gradient(90deg, #4a8c7a, #6ab8a4, #3a6e5e);
+      background-size: 200% 100%;
+      animation:       shimmerBar 1.5s linear infinite;
+    }
+
+    @keyframes shimmerBar {
+      0%   { background-position:  100% 0; }
+      100% { background-position: -100% 0; }
+    }
+
+    .progress-meta {
+      display:     flex;
+      gap:         16px;
+      margin-top:  8px;
+      font-size:   11.5px;
+      color:       var(--text2);
+      font-family: var(--font-body);
+    }
+
+    /* Status badges */
+    .status-badge {
+      display:        inline-flex;
+      align-items:    center;
+      gap:            4px;
+      padding:        2px 10px;
+      border-radius:  99px;
+      font-size:      11px;
+      font-weight:    600;
+      letter-spacing: .3px;
+      font-family:    var(--font-body);
+    }
+    .badge-waiting     { background: rgba(139,148,158,.12); color: var(--text2); }
+    .badge-downloading { background: rgba(74,140,122,.15);  color: var(--accent); }
+    .badge-processing  { background: rgba(245,197,66,.15);  color: var(--accent4); }
+    .badge-enhancing   { background: rgba(74,140,122,.15);  color: var(--accent); }
+    .badge-done        { background: rgba(58,122,101,.15);  color: var(--accent2); }
+    .badge-error       { background: rgba(247,95,79,.15);   color: var(--accent3); }
+    .badge-cancelled   { background: rgba(139,148,158,.12); color: var(--text2); }
+
+    /* ─────────────────────────────────────────────
+       TOGGLE SWITCH
+    ───────────────────────────────────────────── */
+    .toggle-wrap { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+
+    .toggle           { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    .toggle input     { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-track     { position: absolute; inset: 0; background: var(--surface2); border: 1px solid var(--border); border-radius: 99px; transition: .2s; }
+    .toggle input:checked ~ .toggle-track { background: var(--accent); border-color: var(--accent); }
+    .toggle-thumb     { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; background: #fff; border-radius: 50%; transition: .2s; }
+    .toggle input:checked ~ .toggle-track ~ .toggle-thumb,
+    .toggle input:checked + .toggle-track + .toggle-thumb { left: 23px; }
+
+    /* ─────────────────────────────────────────────
+       IMAGE THUMBNAILS
+    ───────────────────────────────────────────── */
+    .thumb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px,1fr)); gap: 12px; margin-top: 12px; }
+
+    .thumb-item {
+      position:      relative;
+      cursor:        pointer;
+      border-radius: 10px;
+      overflow:      hidden;
+      border:        2px solid transparent;
+      transition:    .2s;
+    }
+    .thumb-item:hover    { border-color: var(--accent); }
+    .thumb-item.selected { border-color: var(--accent2); }
+    .thumb-item img      { width: 100%; height: 100px; object-fit: cover; display: block; background: var(--border); }
+
+    .thumb-item .thumb-check {
+      position:        absolute;
+      top:             6px;
+      right:           6px;
+      width:           20px;
+      height:          20px;
+      background:      var(--accent2);
+      border-radius:   50%;
+      display:         none;
+      align-items:     center;
+      justify-content: center;
+      font-size:       12px;
+      color:           #fff;
+    }
+    .thumb-item.selected .thumb-check { display: flex; }
+    .thumb-item .thumb-info { padding: 6px; font-size: 11px; color: var(--text2); background: var(--surface); font-family: var(--font-body); }
+
+    /* ─────────────────────────────────────────────
+       DROP ZONE
+    ───────────────────────────────────────────── */
+    .dropzone {
+      border:        2px dashed var(--border);
+      border-radius: var(--radius);
+      padding:       44px;
+      text-align:    center;
+      cursor:        pointer;
+      transition:    .2s;
+      color:         var(--text2);
+      background:    var(--surface2);
+    }
+    .dropzone:hover, .dropzone.dragover { border-color: var(--accent); background: var(--accent-glow); }
+    .dropzone .drop-icon  { font-size: 44px; margin-bottom: 14px; filter: drop-shadow(0 0 10px rgba(79,142,247,0.3)); }
+    .dropzone p           { font-size: 14px; font-weight: 500; font-family: var(--font-body); }
+    .dropzone .drop-note  { font-size: 12px; color: var(--text3); margin-top: 6px; font-family: var(--font-body); }
+
+    /* ─────────────────────────────────────────────
+       TOAST NOTIFICATIONS
+    ───────────────────────────────────────────── */
+    #toasts {
+      position:       fixed;
+      top:            18px;
+      right:          18px;
+      z-index:        9999;
+      display:        flex;
+      flex-direction: column;
+      gap:            8px;
+      pointer-events: none;
+    }
+
+    .toast {
+      background:     var(--surface);
+      border:         1px solid var(--border);
+      border-radius:  12px;
+      padding:        12px 18px;
+      display:        flex;
+      align-items:    center;
+      gap:            10px;
+      min-width:      270px;
+      max-width:      400px;
+      box-shadow:     var(--shadow);
+      pointer-events: all;
+      animation:      toastIn .25s ease;
+      font-size:      13.5px;
+      font-family:    var(--font-body);
+    }
+    .toast.removing { animation: toastOut .25s ease forwards; }
+
+    @keyframes toastIn  { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+    @keyframes toastOut { to   { opacity: 0; transform: translateX(20px); } }
+
+    .toast-icon      { font-size: 18px; flex-shrink: 0; }
+    .toast.success   { border-left: 3px solid var(--accent2); }
+    .toast.error     { border-left: 3px solid var(--accent3); }
+    .toast.info      { border-left: 3px solid var(--accent); }
+    .toast.warning   { border-left: 3px solid var(--accent4); }
+
+    /* ─────────────────────────────────────────────
+       HISTORY
+    ───────────────────────────────────────────── */
+    .history-item {
+      display:     flex;
+      align-items: center;
+      gap:         12px;
+      padding:     14px;
+      border-bottom: 1px solid var(--border);
+      font-size:   13px;
+      transition:  background .15s;
+      font-family: var(--font-body);
+    }
+    .history-item:hover      { background: var(--surface2); }
+    .history-item:last-child { border-bottom: none; }
+    .history-icon            { font-size: 20px; }
+
+    .history-info                   { flex: 1; min-width: 0; }
+    .history-info .name             { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .history-info .path             { font-size: 11px; color: var(--text2); margin-top: 2px; }
+    .history-actions                { display: flex; gap: 6px; }
+
+    /* ─────────────────────────────────────────────
+       MODAL
+    ───────────────────────────────────────────── */
+    .modal-overlay {
+      display:         none;
+      position:        fixed;
+      inset:           0;
+      background:      rgba(0, 0, 0, .7);
+      z-index:         500;
+      align-items:     center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+    }
+    .modal-overlay.show { display: flex; }
+
+    .modal {
+      background:    var(--surface);
+      border:        1px solid var(--border);
+      border-radius: 16px;
+      padding:       28px;
+      width:         480px;
+      max-width:     90vw;
+      max-height:    85vh;
+      overflow-y:    auto;
+      box-shadow:    var(--shadow);
+    }
+
+    .modal-header                 { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
+    .modal-header h3              { font-family: var(--font-display); font-size: 22px; font-weight: 600; letter-spacing: 0.2px; }
+    .modal-section                { margin-bottom: 22px; }
+    .modal-section h4             { font-size: 10px; color: var(--text3); font-weight: 600; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 1.5px; font-family: var(--font-body); }
+    .modal-row                    { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; font-size: 13.5px; font-family: var(--font-body); }
+
+    /* ─────────────────────────────────────────────
+       PLAYLIST VIDEO ITEMS
+    ───────────────────────────────────────────── */
+    .playlist-video-item {
+      display:     flex;
+      align-items: center;
+      gap:         12px;
+      padding:     12px;
+      border-bottom: 1px solid var(--border);
+      cursor:      pointer;
+      transition:  background .15s;
+    }
+    .playlist-video-item:hover  { background: var(--surface2); }
+    .playlist-video-item img    { width: 80px; height: 45px; object-fit: cover; border-radius: 6px; background: var(--border); flex-shrink: 0; }
+    .playlist-video-item .pv-info  { flex: 1; min-width: 0; }
+    .playlist-video-item .pv-title { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-body); }
+    .playlist-video-item .pv-dur   { font-size: 11px; color: var(--text2); font-family: var(--font-body); }
+    .playlist-count-info           { font-size: 13px; color: var(--text2); margin-bottom: 12px; font-family: var(--font-body); }
+
+    /* ─────────────────────────────────────────────
+       SECTION HEADERS
+    ───────────────────────────────────────────── */
+    .section-header {
+      font-family:    var(--font-display);
+      font-size:      32px;
+      font-weight:    700;
+      margin-bottom:  8px;
+      color:          var(--text);
+      line-height:    1.2;
+      letter-spacing: 0.2px;
+    }
+
+    .section-sub {
+      font-size:      14px;
+      color:          var(--text2);
+      margin-bottom:  26px;
+      line-height:    1.75;
+      font-family:    var(--font-body);
+      font-weight:    400;
+      letter-spacing: 0.1px;
+    }
+
+    /* ─────────────────────────────────────────────
+       MISC UTILITIES
+    ───────────────────────────────────────────── */
+    .divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+    .check-wrap { display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13.5px; font-family: var(--font-body); }
+    .check-wrap input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer; }
+
+    .spinner {
+      width:         16px;
+      height:        16px;
+      border:        2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation:     spin .6s linear infinite;
+      display:       inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Hamburger (mobile) */
+    #hamburger {
+      display:         none;
+      position:        fixed;
+      top:             14px;
+      left:            14px;
+      z-index:         200;
+      background:      var(--surface);
+      border:          1px solid var(--border);
+      border-radius:   10px;
+      width:           42px;
+      height:          42px;
+      align-items:     center;
+      justify-content: center;
+      font-size:       18px;
+      cursor:          pointer;
+    }
+
+    #sidebar-overlay {
+      display:         none;
+      position:        fixed;
+      inset:           0;
+      background:      rgba(0, 0, 0, .6);
+      z-index:         90;
+      backdrop-filter: blur(3px);
+    }
+
+    /* ─────────────────────────────────────────────
+       RESPONSIVE — MOBILE
+    ───────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      #hamburger                    { display: flex; }
+      #sidebar                      { position: fixed; left: -290px; height: 100vh; transition: left .3s; z-index: 100; width: 270px !important; min-width: 270px !important; }
+      #sidebar.mobile-open          { left: 0; }
+      #sidebar.collapsed            { width: 270px !important; min-width: 270px !important; }
+      #sidebar.collapsed .logo-text,
+      #sidebar.collapsed .nav-label,
+      #sidebar.collapsed .version-text,
+      #sidebar.collapsed .nav-badge,
+      #sidebar.collapsed .nav-section-label,
+      #sidebar.collapsed .nav-item .nav-label { opacity: 1; width: auto; }
+      #sidebar-overlay.show         { display: block; }
+      .topbar                       { padding: 12px 16px 12px 62px; }
+      .content                      { padding: 16px; }
+      .input-row                    { flex-direction: column; }
+      .thumb-grid                   { grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); }
+    }
+
+    /* ─────────────────────────────────────────────
+       ENHANCE DROP ZONE
+    ───────────────────────────────────────────── */
+    .enhance-dropzone {
+      border:        2px dashed var(--border);
+      border-radius: 16px;
+      padding:       60px 40px;
+      text-align:    center;
+      cursor:        pointer;
+      transition:    .3s;
+      background:    linear-gradient(135deg, rgba(74,140,122,0.04), rgba(58,110,94,0.04));
+      position:      relative;
+      overflow:      hidden;
+    }
+    .enhance-dropzone::before {
+      content:        '';
+      position:       absolute;
+      inset:          0;
+      background:     radial-gradient(ellipse 300px 200px at 50% 0%, rgba(74,140,122,0.06), transparent);
+      pointer-events: none;
+    }
+    .enhance-dropzone:hover,
+    .enhance-dropzone.dragover { border-color: var(--accent); background: linear-gradient(135deg, rgba(74,140,122,0.08), rgba(58,110,94,0.06)); }
+    .enhance-drop-icon         { font-size: 52px; margin-bottom: 16px; display: block; }
+
+    /* Quality badges */
+    .quality-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 99px; font-size: 12px; font-weight: 600; margin: 4px; font-family: var(--font-body); }
+    .badge-before  { background: rgba(192,83,58,.12);  color: var(--accent3); }
+    .badge-after   { background: rgba(58,122,101,.12); color: var(--accent2); }
+
+    /* Progress ring */
+    .ring-wrap  { position: relative; width: 100px; height: 100px; margin: 0 auto 20px; }
+    .ring-bg    { fill: none; stroke: var(--surface2); stroke-width: 8; }
+    .ring-fill  { fill: none; stroke-width: 8; stroke-linecap: round; transform-origin: 50% 50%; transform: rotate(-90deg); stroke: url(#ringGrad); stroke-dasharray: 283; stroke-dashoffset: 283; transition: stroke-dashoffset .6s ease; }
+    .ring-text  { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; font-family: var(--font-display); color: var(--accent); }
+    .ring-sub   { font-size: 10px; color: var(--text2); font-weight: 400; font-family: var(--font-body); letter-spacing: 0.5px; }
+
+    /* Hero accent box */
+    .hero-accent {
+      background: linear-gradient(135deg, rgba(74,140,122,0.07), rgba(58,110,94,0.05));
+      border:        1px solid rgba(74,140,122,0.18);
+      border-radius: 16px;
+      padding:       28px;
+      margin-bottom: 28px;
+      position:      relative;
+      overflow:      hidden;
+    }
+    .hero-accent::after {
+      content:        '';
+      position:       absolute;
+      top:            -40px;
+      right:          -40px;
+      width:          200px;
+      height:         200px;
+      background:     radial-gradient(ellipse, rgba(74,140,122,0.08), transparent 70%);
+      pointer-events: none;
+    }
+
+    /* Tab fade-in */
+    .tab-panel.active { animation: fadeUp .3s ease; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+    /* ─────────────────────────────────────────────
+       HOME PAGE
+    ───────────────────────────────────────────── */
+    .home-hero {
+      text-align:    center;
+      padding:       72px 20px 56px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 48px;
+      position:      relative;
+    }
+
+    .home-wave { font-size: 52px; margin-bottom: 20px; display: block; animation: wave 2.5s ease-in-out infinite; }
+    @keyframes wave { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(15deg); } }
+
+    .home-headline {
+      font-family:    var(--font-display);
+      font-size:      56px;
+      font-weight:    700;
+      line-height:    1.1;
+      margin-bottom:  18px;
+      color:          var(--text);
+      letter-spacing: 0.3px;
+    }
+
+    .home-name { color: var(--accent); position: relative; font-style: italic; }
+    .home-name::after { content: ''; position: absolute; bottom: -4px; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent), transparent); border-radius: 2px; opacity: 0.5; }
+
+    .home-tagline {
+      font-family:    var(--font-display);
+      font-size:      20px;
+      color:          var(--text2);
+      margin-bottom:  14px;
+      font-weight:    400;
+      font-style:     italic;
+      letter-spacing: 0.2px;
+      line-height:    1.6;
+    }
+
+    .home-intro {
+      font-family:    var(--font-body);
+      font-size:      15px;
+      color:          var(--text2);
+      max-width:      520px;
+      margin:         0 auto 42px;
+      line-height:    1.85;
+      font-weight:    400;
+      letter-spacing: 0.1px;
+    }
+
+    .home-cta-wrap     { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    .home-cta-question { font-family: var(--font-display); font-size: 26px; font-weight: 600; color: var(--text); letter-spacing: 0.2px; font-style: italic; }
+    .home-cta-btn      { padding: 14px 48px; font-size: 15px; border-radius: 50px; letter-spacing: 0.4px; font-weight: 600; }
+
+    .home-features-title { font-family: var(--font-display); font-size: 26px; font-weight: 600; color: var(--text); margin-bottom: 24px; padding-left: 2px; letter-spacing: 0.2px; }
+
+    .home-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px,1fr)); gap: 16px; margin-bottom: 28px; }
+
+    .home-card {
+      background:    var(--surface);
+      border:        1px solid var(--border);
+      border-radius: 14px;
+      padding:       26px;
+      cursor:        pointer;
+      transition:    all .22s;
+      position:      relative;
+      overflow:      hidden;
+    }
+    .home-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; background: linear-gradient(90deg, var(--accent), transparent); opacity: 0; transition: opacity .22s; }
+    .home-card:hover   { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 8px 28px rgba(74,140,122,0.12); }
+    .home-card:hover::before { opacity: 1; }
+
+    .home-card-icon  { font-size: 30px; margin-bottom: 14px; display: block; }
+    .home-card-title { font-family: var(--font-display); font-size: 18px; font-weight: 600; color: var(--text); margin-bottom: 10px; line-height: 1.3; letter-spacing: 0.1px; }
+    .home-card-desc  { font-size: 13.5px; color: var(--text2); line-height: 1.75; margin-bottom: 16px; font-family: var(--font-body); font-weight: 400; letter-spacing: 0.1px; }
+    .home-card-tag   { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; color: var(--accent); background: var(--accent-glow); padding: 3px 10px; border-radius: 99px; letter-spacing: 0.8px; font-family: var(--font-body); text-transform: uppercase; }
+    .new-tag         { color: var(--surface); background: var(--accent); }
+
+    @media (max-width: 700px) { .home-headline { font-size: 36px; } }
+
+    /* ─────────────────────────────────────────────
+       ENHANCE RESULT & PROCESSING BOXES
+    ───────────────────────────────────────────── */
+    .enhance-result-box {
+      display:       none;
+      background:    linear-gradient(135deg, rgba(42,122,90,0.08), rgba(58,140,100,0.05));
+      border:        1.5px solid rgba(58,122,101,0.3);
+      border-radius: 16px;
+      padding:       32px 28px;
+      text-align:    center;
+      margin-top:    20px;
+      animation:     fadeUp .4s ease;
+    }
+    .enhance-result-box.show { display: block; }
+
+    .enhance-result-box .result-icon  { font-size: 52px; margin-bottom: 12px; display: block; animation: pop .4s cubic-bezier(.34,1.56,.64,1); }
+    @keyframes pop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+    .enhance-result-box .result-title   { font-family: var(--font-display); font-size: 28px; font-weight: 700; color: var(--accent2); margin-bottom: 6px; letter-spacing: 0.2px; }
+    .enhance-result-box .result-sub     { font-size: 13.5px; color: var(--text2); margin-bottom: 24px; line-height: 1.7; font-family: var(--font-body); }
+    .enhance-result-box .result-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+    .enhance-processing-box {
+      display:       none;
+      background:    var(--surface);
+      border:        1px solid var(--border);
+      border-radius: 16px;
+      padding:       32px 28px;
+      margin-top:    20px;
+    }
+    .enhance-processing-box.show { display: block; }
+
+  </style>
 </head>
+
 <body>
 
-<button id="hamburger" onclick="toggleMobileSidebar()">☰</button>
-<div id="sidebar-overlay" onclick="closeMobileSidebar()"></div>
+  <!-- ── MOBILE: hamburger & overlay ── -->
+  <button id="hamburger" onclick="toggleMobileSidebar()">☰</button>
+  <div id="sidebar-overlay" onclick="closeMobileSidebar()"></div>
 
-<nav id="sidebar">
-  <div class="sidebar-header">
-    <div class="logo-icon">▶</div>
-    <div>
-      <div class="logo-text">MediaMate</div>
-      <div class="logo-sub">Downloader Pro</div>
-    </div>
-  </div>
-  <div class="nav">
-    <button class="nav-item active" id="nav-home" onclick="switchTab('home',this)"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></button>
-    <div class="nav-section-label" style="margin-top:6px">Downloaders</div>
-    <button class="nav-item" id="nav-video" onclick="switchTab('video',this)"><span class="nav-icon">🎬</span><span class="nav-label">Video Downloader</span></button>
-    <button class="nav-item" id="nav-audio" onclick="switchTab('audio',this)"><span class="nav-icon">🎵</span><span class="nav-label">Audio Downloader</span></button>
-    <button class="nav-item" id="nav-convert" onclick="switchTab('convert',this)"><span class="nav-icon">🔄</span><span class="nav-label">Video to Audio</span></button>
-    <button class="nav-item" id="nav-playlist" onclick="switchTab('playlist',this)"><span class="nav-icon">📋</span><span class="nav-label">Playlist Downloader</span></button>
-    <button class="nav-item" id="nav-images" onclick="switchTab('images',this)"><span class="nav-icon">🖼️</span><span class="nav-label">Image Downloader</span></button>
-    <div class="nav-section-label" style="margin-top:10px">Enhancement</div>
-    <button class="nav-item" id="nav-blur" onclick="switchTab('blur',this)"><span class="nav-icon">✨</span><span class="nav-label">Blur → High Quality</span><span class="nav-badge">NEW</span></button>
-    <div class="nav-section-label" style="margin-top:10px">More</div>
-    <button class="nav-item" id="nav-history" onclick="switchTab('history',this)"><span class="nav-icon">🕓</span><span class="nav-label">History</span></button>
-  </div>
-  <div class="sidebar-footer">
-    <button class="nav-item" onclick="openSettings()"><span class="nav-icon">⚙️</span><span class="nav-label">Settings</span></button>
-    <div class="version-text">v2.0.0 · MediaMate Downloader</div>
-  </div>
-</nav>
+  <!-- ══════════════════════════════════════════════
+       SIDEBAR
+  ══════════════════════════════════════════════ -->
+  <nav id="sidebar">
 
-<div id="main">
-  <div class="topbar">
-    <div class="topbar-title" id="page-title">🏠 Home</div>
-    <div class="topbar-actions">
-      <button class="btn-icon" title="Toggle Theme" onclick="toggleTheme()">🌙</button>
-      <button class="btn btn-secondary btn-sm" onclick="openFolder('')">📂 Downloads</button>
-    </div>
-  </div>
-
-  <div class="content">
-
-    <!-- HOME -->
-    <div id="tab-home" class="tab-panel active">
-      <div class="home-hero">
-        <div class="home-wave">👋</div>
-        <h1 class="home-headline">Hey, I'm <span class="home-name">MediaMate</span></h1>
-        <p class="home-tagline">Your personal media downloading companion.<br>Tell me a link — I'll handle the rest.</p>
-        <p class="home-intro">Whether it's a YouTube binge, a TikTok you want to keep, a podcast episode, or a whole playlist — I've got you. No sign-ups. No limits. Just paste and go.</p>
-        <div class="home-cta-wrap">
-          <div class="home-cta-question">So — what do you want to download today?</div>
-          <button class="btn btn-primary home-cta-btn" onclick="switchTab('video', document.getElementById('nav-video'))">Let's Go →</button>
-        </div>
-      </div>
-      <div class="home-features-title">Here's everything I can do for you</div>
-      <div class="home-cards">
-        <div class="home-card" onclick="switchTab('video', document.getElementById('nav-video'))">
-          <div class="home-card-icon">🎬</div>
-          <div class="home-card-title">Download Any Video</div>
-          <div class="home-card-desc">Drop a YouTube, TikTok, Instagram, Twitter, Facebook or Vimeo link — get it in HD, Full HD, or 4K.</div>
-          <div class="home-card-tag">Video Downloader</div>
-        </div>
-        <div class="home-card" onclick="switchTab('audio', document.getElementById('nav-audio'))">
-          <div class="home-card-icon">🎵</div>
-          <div class="home-card-title">Extract Audio Tracks</div>
-          <div class="home-card-desc">Give me the link and I'll extract crisp MP3, FLAC or WAV — complete with album art and auto-tagged metadata.</div>
-          <div class="home-card-tag">Audio Downloader</div>
-        </div>
-        <div class="home-card" onclick="switchTab('convert', document.getElementById('nav-convert'))">
-          <div class="home-card-icon">🔄</div>
-          <div class="home-card-title">Convert Video to Audio</div>
-          <div class="home-card-desc">Drop it in and I'll strip the audio instantly — no online tools, no waiting, everything stays local.</div>
-          <div class="home-card-tag">Video to Audio</div>
-        </div>
-        <div class="home-card" onclick="switchTab('playlist', document.getElementById('nav-playlist'))">
-          <div class="home-card-icon">📋</div>
-          <div class="home-card-title">Download Entire Playlists</div>
-          <div class="home-card-desc">Select your videos, set your quality, and I'll queue them all up in one seamless batch.</div>
-          <div class="home-card-tag">Playlist Downloader</div>
-        </div>
-        <div class="home-card" onclick="switchTab('images', document.getElementById('nav-images'))">
-          <div class="home-card-icon">🖼️</div>
-          <div class="home-card-title">Capture Webpage Images</div>
-          <div class="home-card-desc">Point me at any webpage and I'll scan it, surface every image, and let you download them all as a ZIP.</div>
-          <div class="home-card-tag">Image Downloader</div>
-        </div>
-        <div class="home-card" onclick="switchTab('blur', document.getElementById('nav-blur'))">
-          <div class="home-card-icon">✨</div>
-          <div class="home-card-title">Restore Blurry Videos</div>
-          <div class="home-card-desc">Upload a blurry clip — I'll sharpen it, reduce noise, boost contrast and upscale it. Real FFmpeg processing, not fake.</div>
-          <div class="home-card-tag new-tag">NEW · Blur Enhancer</div>
-        </div>
+    <div class="sidebar-header">
+      <div class="logo-icon">▶</div>
+      <div>
+        <div class="logo-text">MediaMate</div>
+        <div class="logo-sub">Downloader Pro</div>
       </div>
     </div>
 
-    <!-- VIDEO -->
-    <div id="tab-video" class="tab-panel">
-      <div class="hero-accent">
-        <div class="section-header">🎬 Video Downloader</div>
-        <div class="section-sub">Download from YouTube, Instagram, TikTok, Twitter/X, Facebook, Vimeo &amp; 1000+ sites</div>
-      </div>
-      <div class="card">
-        <div class="card-title"><span>🔗</span> Video URLs</div>
-        <div id="video-urls"></div>
-        <button class="btn btn-secondary btn-sm" onclick="addUrlField('video-urls','video')">＋ Add Another Link</button>
-      </div>
-      <div class="card">
-        <div class="card-title"><span>⚙️</span> Download Settings</div>
-        <div class="input-row">
-          <div class="field" style="flex:1"><label>Format</label>
-            <select class="input" id="v-format"><option value="mp4">MP4</option><option value="mkv">MKV</option><option value="webm">WEBM</option><option value="avi">AVI</option><option value="mov">MOV</option><option value="flv">FLV</option></select>
-          </div>
-          <div class="field" style="flex:1"><label>Quality</label>
-            <select class="input" id="v-quality"><option value="best">Best Available</option><option value="4k">4K (2160p)</option><option value="1080p">1080p Full HD</option><option value="720p">720p HD</option><option value="480p">480p</option><option value="360p">360p</option></select>
-          </div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-title"><span>💬</span> Subtitles / Language</div>
-        <div class="input-row">
-          <div class="field" style="flex:1"><label>Subtitle Language</label>
-            <select class="input" id="v-sublang"><option value="none">None</option><option value="en">English</option><option value="ur">Urdu</option><option value="hi">Hindi</option><option value="ar">Arabic</option><option value="fr">French</option><option value="es">Spanish</option><option value="de">German</option></select>
-          </div>
-          <div class="field" style="flex:1;display:flex;align-items:flex-end;gap:16px;padding-bottom:2px">
-            <label class="check-wrap"><input type="checkbox" id="v-embedsubs"> Embed subtitles into video</label>
-          </div>
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-title"><span>✨</span> Video Enhancement</div>
-        <label class="toggle-wrap">
-          <span class="toggle"><input type="checkbox" id="v-enhance"><div class="toggle-track"></div><div class="toggle-thumb"></div></span>
-          <span style="font-size:13.5px;font-family:var(--font-body)">Enhance after download (FFmpeg sharpening + upscale)</span>
-        </label>
-        <div id="v-enhance-opts" style="display:none;margin-top:12px">
-          <label class="check-wrap"><input type="checkbox" id="v-keep-orig" checked> Keep original file alongside enhanced version</label>
-        </div>
-      </div>
-      <div id="video-progress-area"></div>
-      <button id="video-download-btn" class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;font-size:15px" onclick="startVideoDownload()">⬇️ Download Videos</button>
+    <div class="nav">
+
+      <button class="nav-item active" id="nav-home" onclick="switchTab('home', this)">
+        <span class="nav-icon">🏠</span>
+        <span class="nav-label">Home</span>
+      </button>
+
+      <div class="nav-section-label" style="margin-top:6px">Downloaders</div>
+
+      <button class="nav-item" id="nav-video"    onclick="switchTab('video', this)">    <span class="nav-icon">🎬</span><span class="nav-label">Video Downloader</span></button>
+      <button class="nav-item" id="nav-audio"    onclick="switchTab('audio', this)">    <span class="nav-icon">🎵</span><span class="nav-label">Audio Downloader</span></button>
+      <button class="nav-item" id="nav-convert"  onclick="switchTab('convert', this)">  <span class="nav-icon">🔄</span><span class="nav-label">Video to Audio</span></button>
+      <button class="nav-item" id="nav-playlist" onclick="switchTab('playlist', this)"> <span class="nav-icon">📋</span><span class="nav-label">Playlist Downloader</span></button>
+      <button class="nav-item" id="nav-images"   onclick="switchTab('images', this)">   <span class="nav-icon">🖼️</span><span class="nav-label">Image Downloader</span></button>
+
+      <div class="nav-section-label" style="margin-top:10px">Enhancement</div>
+
+      <button class="nav-item" id="nav-blur" onclick="switchTab('blur', this)">
+        <span class="nav-icon">✨</span>
+        <span class="nav-label">Blur → High Quality</span>
+        <span class="nav-badge">NEW</span>
+      </button>
+
+      <div class="nav-section-label" style="margin-top:10px">More</div>
+
+      <button class="nav-item" id="nav-history" onclick="switchTab('history', this)">
+        <span class="nav-icon">🕓</span>
+        <span class="nav-label">History</span>
+      </button>
+
     </div>
 
-    <!-- AUDIO -->
-    <div id="tab-audio" class="tab-panel">
-      <div class="hero-accent">
-        <div class="section-header">🎵 Audio Downloader</div>
-        <div class="section-sub">Extract audio from any video URL — music, podcasts, speeches and more</div>
-      </div>
-      <div class="card">
-        <div class="card-title"><span>🔗</span> Audio / Video URLs</div>
-        <div id="audio-urls"></div>
-        <button class="btn btn-secondary btn-sm" onclick="addUrlField('audio-urls','audio')">＋ Add Another Link</button>
-      </div>
-      <div class="card">
-        <div class="card-title"><span>⚙️</span> Audio Settings</div>
-        <div class="input-row">
-          <div class="field" style="flex:1"><label>Format</label>
-            <select class="input" id="a-format"><option value="mp3">MP3</option><option value="aac">AAC</option><option value="flac">FLAC</option><option value="wav">WAV</option><option value="ogg">OGG</option><option value="m4a">M4A</option><option value="opus">OPUS</option></select>
-          </div>
-          <div class="field" style="flex:1"><label>Quality / Bitrate</label>
-            <select class="input" id="a-quality"><option value="320">320 kbps (Best)</option><option value="256">256 kbps</option><option value="192">192 kbps</option><option value="128">128 kbps</option><option value="64">64 kbps</option></select>
-          </div>
-        </div>
-      </div>
-      <div id="audio-progress-area"></div>
-      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;font-size:15px" onclick="startAudioDownload()">🎵 Download Audio</button>
+    <div class="sidebar-footer">
+      <button class="nav-item" onclick="openSettings()">
+        <span class="nav-icon">⚙️</span>
+        <span class="nav-label">Settings</span>
+      </button>
+      <div class="version-text">v2.0.0 · MediaMate Downloader</div>
     </div>
 
-    <!-- CONVERT -->
-    <div id="tab-convert" class="tab-panel">
-      <div class="hero-accent">
-        <div class="section-header">🔄 Video to Audio</div>
-        <div class="section-sub">Upload a video file or paste a URL to extract audio</div>
+  </nav>
+
+  <!-- ══════════════════════════════════════════════
+       MAIN CONTENT
+  ══════════════════════════════════════════════ -->
+  <div id="main">
+
+    <!-- Topbar -->
+    <div class="topbar">
+      <div class="topbar-title" id="page-title">🏠 Home</div>
+      <div class="topbar-actions">
+        <button class="btn-icon" title="Toggle Theme" onclick="toggleTheme()">🌙</button>
+        <button class="btn btn-secondary btn-sm" onclick="openFolder('')">📂 Downloads</button>
       </div>
-      <div class="card">
-        <div class="card-title"><span>📁</span> Input — Upload File or Paste URL</div>
-        <div id="convert-dropzone" class="dropzone" onclick="document.getElementById('convert-file').click()" ondragover="dragOver(event,'convert-dropzone')" ondragleave="dragLeave(event,'convert-dropzone')" ondrop="dropFile(event)">
-          <div class="drop-icon">📁</div>
-          <p>Drag &amp; Drop video file here</p>
-          <div class="drop-note">Supports: MP4, MKV, AVI, MOV, WEBM, FLV, WMV</div>
-          <div style="margin-top:12px;font-size:13px;color:var(--text3);font-family:var(--font-body)">or click to browse</div>
-        </div>
-        <input type="file" id="convert-file" accept=".mp4,.mkv,.avi,.mov,.webm,.flv,.wmv" style="display:none" onchange="fileSelected(this)"/>
-        <div id="convert-file-info" style="display:none;margin-top:10px;padding:12px;background:var(--surface2);border-radius:9px;font-size:13px;border:1px solid var(--border);font-family:var(--font-body)"></div>
-        <div class="divider" style="margin:18px 0;text-align:center;position:relative">
-          <span style="background:var(--surface);padding:0 14px;color:var(--text2);font-size:12px;font-weight:600;position:relative;z-index:1;letter-spacing:.5px;font-family:var(--font-body)">OR</span>
-        </div>
-        <div class="field"><label>Paste Online Video URL</label><input class="input" id="convert-url" placeholder="https://youtube.com/watch?v=..."/></div>
-      </div>
-      <div class="card">
-        <div class="card-title"><span>⚙️</span> Output Settings</div>
-        <div class="input-row">
-          <div class="field" style="flex:1"><label>Output Format</label>
-            <select class="input" id="c-format"><option value="mp3">MP3</option><option value="aac">AAC</option><option value="flac">FLAC</option><option value="wav">WAV</option><option value="ogg">OGG</option><option value="m4a">M4A</option></select>
-          </div>
-          <div class="field" style="flex:1"><label>Quality</label>
-            <select class="input" id="c-quality"><option value="320">320 kbps</option><option value="256">256 kbps</option><option value="192">192 kbps</option><option value="128">128 kbps</option></select>
-          </div>
-        </div>
-        <div class="field"><label>Output Filename (optional)</label><input class="input" id="c-rename" placeholder="Leave empty to use original name"/></div>
-      </div>
-      <div id="convert-progress-area"></div>
-      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;font-size:15px" onclick="startConvert()">🔄 Convert to Audio</button>
     </div>
 
-    <!-- PLAYLIST -->
-    <div id="tab-playlist" class="tab-panel">
-      <div class="hero-accent">
-        <div class="section-header">📋 Playlist Downloader</div>
-        <div class="section-sub">Download entire YouTube playlists or channels with one click</div>
-      </div>
-      <div class="card">
-        <div class="card-title"><span>🔗</span> Playlist or Channel URL</div>
-        <div style="display:flex;gap:10px">
-          <input class="input" id="playlist-url" placeholder="Paste YouTube playlist or channel URL..." style="flex:1"/>
-          <button class="btn btn-secondary" onclick="fetchPlaylist()"><span id="pl-btn-txt">🔍 Fetch</span></button>
-        </div>
-        <div id="playlist-info" style="display:none;margin-top:14px"></div>
-      </div>
-      <div id="playlist-videos-card" style="display:none" class="card">
-        <div class="card-title"><span>📋</span> Videos</div>
-        <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-          <button class="btn btn-secondary btn-sm" onclick="selectAllPlaylist(true)">✅ Select All</button>
-          <button class="btn btn-secondary btn-sm" onclick="selectAllPlaylist(false)">☐ Deselect All</button>
-          <div style="display:flex;gap:8px;align-items:center;margin-left:auto">
-            <span style="font-size:12px;color:var(--text2);font-family:var(--font-body)">Range:</span>
-            <input class="input" id="pl-range-from" placeholder="From #" style="width:70px"/>
-            <span style="font-size:12px;color:var(--text2);font-family:var(--font-body)">to</span>
-            <input class="input" id="pl-range-to" placeholder="To #" style="width:70px"/>
-            <button class="btn btn-secondary btn-sm" onclick="applyRange()">Apply</button>
-          </div>
-        </div>
-        <div id="playlist-video-list" style="max-height:380px;overflow-y:auto;border:1px solid var(--border);border-radius:9px"></div>
-        <div class="playlist-count-info" id="pl-selected-count" style="margin-top:10px"></div>
-      </div>
-      <div id="playlist-settings-card" style="display:none" class="card">
-        <div class="card-title"><span>⚙️</span> Download Settings</div>
-        <div class="input-row">
-          <div class="field" style="flex:1"><label>Format</label>
-            <select class="input" id="pl-format"><option value="mp4">MP4</option><option value="mkv">MKV</option><option value="webm">WEBM</option></select>
-          </div>
-          <div class="field" style="flex:1"><label>Quality</label>
-            <select class="input" id="pl-quality"><option value="best">Best</option><option value="1080p">1080p</option><option value="720p">720p</option><option value="480p">480p</option></select>
-          </div>
-          <div class="field" style="flex:1"><label>Subtitle Language</label>
-            <select class="input" id="pl-sublang"><option value="none">None</option><option value="en">English</option><option value="ur">Urdu</option><option value="hi">Hindi</option></select>
-          </div>
-        </div>
-        <label class="check-wrap"><input type="checkbox" id="pl-skip-dl"> Skip already downloaded videos</label>
-      </div>
-      <div id="playlist-progress-area"></div>
-      <button id="pl-download-btn" style="display:none;width:100%" class="btn btn-primary" onclick="startPlaylistDownload()">⬇️ Download Selected</button>
-    </div>
+    <div class="content">
 
-    <!-- IMAGES -->
-    <div id="tab-images" class="tab-panel">
-      <div class="hero-accent">
-        <div class="section-header">🖼️ Image Downloader</div>
-        <div class="section-sub">Download images directly or extract all images from any webpage</div>
-      </div>
-      <div class="card">
-        <div class="card-title"><span>🔗</span> Image / Webpage URLs</div>
-        <div id="image-urls"></div>
-        <button class="btn btn-secondary btn-sm" onclick="addUrlField('image-urls','image')">＋ Add Another URL</button>
-        <p style="font-size:12px;color:var(--text2);margin-top:10px;font-family:var(--font-body)">💡 Paste a <strong>webpage URL</strong> to extract all images, or paste a <strong>direct image URL</strong></p>
-        <button class="btn btn-secondary" style="margin-top:10px" onclick="extractImages()">🔍 Extract Images from Page</button>
-      </div>
-      <div id="image-grid-card" style="display:none" class="card">
-        <div class="card-title"><span>🖼️</span> Found Images</div>
-        <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-          <button class="btn btn-secondary btn-sm" onclick="selectAllImages(true)">✅ Select All</button>
-          <button class="btn btn-secondary btn-sm" onclick="selectAllImages(false)">☐ Deselect All</button>
-          <span id="img-selected-count" style="font-size:12px;color:var(--text2);display:flex;align-items:center;margin-left:auto;font-family:var(--font-body)"></span>
-        </div>
-        <div id="image-thumb-grid" class="thumb-grid"></div>
-      </div>
-      <div class="card">
-        <div class="card-title"><span>⚙️</span> Save Settings</div>
-        <div class="input-row">
-          <div class="field" style="flex:1"><label>Save Format</label>
-            <select class="input" id="img-format"><option value="jpg">JPG</option><option value="png">PNG</option><option value="webp">WEBP</option><option value="gif">GIF</option><option value="bmp">BMP</option></select>
-          </div>
-          <div class="field" style="flex:1"><label>Rename Prefix (auto-numbered)</label>
-            <input class="input" id="img-rename" placeholder="e.g. photo → photo_001.jpg"/>
-          </div>
-        </div>
-        <label class="check-wrap" style="margin-top:8px"><input type="checkbox" id="img-zip" checked> Download as ZIP archive</label>
-      </div>
-      <div id="images-progress-area"></div>
-      <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px;font-size:15px" onclick="downloadImages()">⬇️ Download Images</button>
-    </div>
+      <!-- ──────────────────────────────────────
+           TAB: HOME
+      ────────────────────────────────────────── -->
+      <div id="tab-home" class="tab-panel active">
 
-    <!-- ══════════════════════════════════════════
-         BLUR ENHANCER  —  REAL FFmpeg processing
-         ══════════════════════════════════════════ -->
-    <div id="tab-blur" class="tab-panel">
-      <div class="hero-accent" style="background:linear-gradient(135deg,rgba(74,140,122,0.08),rgba(58,110,94,0.06));border-color:rgba(74,140,122,0.2)">
-        <div class="section-header">✨ Blur → High Quality</div>
-        <div class="section-sub">Upload your blurry or low-quality video. We'll sharpen, denoise, boost contrast and upscale it using real FFmpeg processing — not AI cartoonish effects.</div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <span class="quality-badge badge-before">Before: Blurry / Low-res</span>
-          <span style="display:flex;align-items:center;font-size:14px">→</span>
-          <span class="quality-badge badge-after">After: Sharp &amp; Natural HD</span>
+        <div class="home-hero">
+          <div class="home-wave">👋</div>
+          <h1 class="home-headline">Hey, I'm <span class="home-name">MediaMate</span></h1>
+          <p class="home-tagline">Your personal media downloading companion.<br>Tell me a link — I'll handle the rest.</p>
+          <p class="home-intro">Whether it's a YouTube binge, a TikTok you want to keep, a podcast episode, or a whole playlist — I've got you. No sign-ups. No limits. Just paste and go.</p>
+          <div class="home-cta-wrap">
+            <div class="home-cta-question">So — what do you want to download today?</div>
+            <button class="btn btn-primary home-cta-btn" onclick="switchTab('video', document.getElementById('nav-video'))">Let's Go →</button>
+          </div>
+        </div>
+
+        <div class="home-features-title">Here's everything I can do for you</div>
+
+        <div class="home-cards">
+
+          <div class="home-card" onclick="switchTab('video', document.getElementById('nav-video'))">
+            <div class="home-card-icon">🎬</div>
+            <div class="home-card-title">Download Any Video</div>
+            <div class="home-card-desc">Drop a YouTube, TikTok, Instagram, Twitter, Facebook or Vimeo link — get it in HD, Full HD, or 4K.</div>
+            <div class="home-card-tag">Video Downloader</div>
+          </div>
+
+          <div class="home-card" onclick="switchTab('audio', document.getElementById('nav-audio'))">
+            <div class="home-card-icon">🎵</div>
+            <div class="home-card-title">Extract Audio Tracks</div>
+            <div class="home-card-desc">Give me the link and I'll extract crisp MP3, FLAC or WAV — complete with album art and auto-tagged metadata.</div>
+            <div class="home-card-tag">Audio Downloader</div>
+          </div>
+
+          <div class="home-card" onclick="switchTab('convert', document.getElementById('nav-convert'))">
+            <div class="home-card-icon">🔄</div>
+            <div class="home-card-title">Convert Video to Audio</div>
+            <div class="home-card-desc">Drop it in and I'll strip the audio instantly — no online tools, no waiting, everything stays local.</div>
+            <div class="home-card-tag">Video to Audio</div>
+          </div>
+
+          <div class="home-card" onclick="switchTab('playlist', document.getElementById('nav-playlist'))">
+            <div class="home-card-icon">📋</div>
+            <div class="home-card-title">Download Entire Playlists</div>
+            <div class="home-card-desc">Select your videos, set your quality, and I'll queue them all up in one seamless batch.</div>
+            <div class="home-card-tag">Playlist Downloader</div>
+          </div>
+
+          <div class="home-card" onclick="switchTab('images', document.getElementById('nav-images'))">
+            <div class="home-card-icon">🖼️</div>
+            <div class="home-card-title">Capture Webpage Images</div>
+            <div class="home-card-desc">Point me at any webpage and I'll scan it, surface every image, and let you download them all as a ZIP.</div>
+            <div class="home-card-tag">Image Downloader</div>
+          </div>
+
+          <div class="home-card" onclick="switchTab('blur', document.getElementById('nav-blur'))">
+            <div class="home-card-icon">✨</div>
+            <div class="home-card-title">Restore Blurry Videos</div>
+            <div class="home-card-desc">Upload a blurry clip — I'll sharpen it, reduce noise, boost contrast and upscale it. Real FFmpeg processing, not fake.</div>
+            <div class="home-card-tag new-tag">NEW · Blur Enhancer</div>
+          </div>
+
         </div>
       </div>
 
-      <!-- UPLOAD -->
-      <div class="card" id="blur-upload-card">
-        <div class="card-title"><span>📁</span> Upload Your Video</div>
-        <div id="blur-dropzone" class="enhance-dropzone"
-             onclick="document.getElementById('blur-file-input').click()"
-             ondragover="blurDragOver(event)" ondragleave="blurDragLeave(event)" ondrop="blurDropFile(event)">
-          <span class="enhance-drop-icon">🎞️</span>
-          <p style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px;font-family:var(--font-body)">Drag &amp; Drop your blurry video here</p>
-          <div style="font-size:13px;color:var(--text2);font-family:var(--font-body)">Supports: MP4, MKV, AVI, MOV, WEBM, FLV, WMV</div>
-          <div class="drop-note" style="margin-top:10px">or click to browse files</div>
-        </div>
-        <input type="file" id="blur-file-input" accept=".mp4,.mkv,.avi,.mov,.webm,.flv,.wmv" style="display:none" onchange="blurFileSelected(this)"/>
-        <div id="blur-file-info" style="display:none;margin-top:12px;padding:12px 16px;background:var(--surface2);border-radius:10px;font-size:13px;border:1px solid var(--border);display:flex;align-items:center;gap:10px;font-family:var(--font-body)">
-          <span style="font-size:22px">🎞️</span>
-          <div id="blur-file-details"></div>
-        </div>
-      </div>
+      <!-- ──────────────────────────────────────
+           TAB: VIDEO DOWNLOADER
+      ────────────────────────────────────────── -->
+      <div id="tab-video" class="tab-panel">
 
-      <!-- SETTINGS -->
-      <div class="card" id="blur-settings-card">
-        <div class="card-title"><span>⚙️</span> Enhancement Settings</div>
-        <div class="input-row">
-          <div class="field" style="flex:1"><label>Enhancement Level</label>
-            <select class="input" id="blur-level">
-              <option value="light">Light — Subtle sharpening only</option>
-              <option value="medium" selected>Medium — Balanced (recommended)</option>
-              <option value="strong">Strong — Max sharpening + full denoise</option>
-            </select>
-          </div>
-          <div class="field" style="flex:1"><label>Target Resolution</label>
-            <select class="input" id="blur-res">
-              <option value="auto">Auto (Best fit)</option>
-              <option value="720p">720p HD</option>
-              <option value="1080p">1080p Full HD</option>
-              <option value="original">Keep Original Size</option>
-            </select>
-          </div>
+        <div class="hero-accent">
+          <div class="section-header">🎬 Video Downloader</div>
+          <div class="section-sub">Download from YouTube, Instagram, TikTok, Twitter/X, Facebook, Vimeo &amp; 1000+ sites</div>
         </div>
-        <div class="field"><label>Output Format</label>
-          <select class="input" id="blur-format" style="max-width:220px">
-            <option value="mp4">MP4 (Recommended)</option>
-            <option value="mkv">MKV</option>
-            <option value="mov">MOV</option>
-          </select>
-        </div>
-        <label class="check-wrap" style="margin-top:6px">
-          <input type="checkbox" id="blur-keep-orig" checked>
-          Keep original file alongside enhanced version
-        </label>
-      </div>
 
-      <!-- PROCESSING PROGRESS -->
-      <div class="enhance-processing-box" id="blur-processing-box">
-        <div style="text-align:center;margin-bottom:24px">
-          <!-- SVG ring -->
-          <svg width="110" height="110" viewBox="0 0 110 110" style="display:block;margin:0 auto">
-            <defs>
-              <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%" stop-color="#4a8c7a"/>
-                <stop offset="100%" stop-color="#3a6e5e"/>
-              </linearGradient>
-            </defs>
-            <circle class="ring-bg" cx="55" cy="55" r="45"/>
-            <circle class="ring-fill" id="blur-ring" cx="55" cy="55" r="45"/>
-          </svg>
-          <div style="margin-top:-95px;height:95px;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none">
-            <div id="blur-pct-text" style="font-family:var(--font-display);font-size:22px;font-weight:700;color:var(--accent)">0%</div>
-            <div style="font-size:10px;color:var(--text2);font-family:var(--font-body);letter-spacing:0.5px">processing</div>
-          </div>
+        <!-- URLs -->
+        <div class="card">
+          <div class="card-title"><span>🔗</span> Video URLs</div>
+          <div id="video-urls"></div>
+          <button class="btn btn-secondary btn-sm" onclick="addUrlField('video-urls','video')">＋ Add Another Link</button>
         </div>
-        <div style="text-align:center;margin-bottom:20px">
-          <div id="blur-stage-label" style="font-family:var(--font-display);font-size:20px;font-weight:600;margin-bottom:4px">Uploading video...</div>
-          <div id="blur-stage-sub" style="font-size:13px;color:var(--text2);font-family:var(--font-body)">Please wait</div>
-        </div>
-        <div style="background:var(--surface2);border-radius:10px;padding:16px">
-          <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:8px;font-family:var(--font-body)">
-            <span>Enhancement Progress</span><span id="blur-bar-pct-text">0%</span>
-          </div>
-          <div class="progress-bar-wrap" style="height:8px">
-            <div class="progress-bar enhancing" id="blur-prog-bar" style="width:0%"></div>
-          </div>
-          <div style="display:flex;gap:16px;margin-top:10px;font-size:11.5px;color:var(--text2);font-family:var(--font-body)">
-            <span id="blur-speed-text">⚡ —</span>
-            <span id="blur-eta-text">⏱️ ETA: —</span>
-            <span id="blur-elapsed-text">🕐 0s</span>
-          </div>
-        </div>
-        <div style="display:flex;justify-content:center;margin-top:16px">
-          <button class="btn btn-danger btn-sm" onclick="cancelBlurEnhance()">⏹ Cancel</button>
-        </div>
-      </div>
 
-      <!-- ✅ RESULT BOX — with real DOWNLOAD button -->
-      <div class="enhance-result-box" id="blur-result-box">
-        <span class="result-icon">🎉</span>
-        <div class="result-title">Enhancement Complete!</div>
-        <div class="result-sub" id="blur-result-sub">
-          Your video has been sharpened, denoised and upscaled successfully.<br>
-          Click below to save it to your computer.
+        <!-- Settings -->
+        <div class="card">
+          <div class="card-title"><span>⚙️</span> Download Settings</div>
+          <div class="input-row">
+            <div class="field" style="flex:1">
+              <label>Format</label>
+              <select class="input" id="v-format">
+                <option value="mp4">MP4</option>
+                <option value="mkv">MKV</option>
+                <option value="webm">WEBM</option>
+                <option value="avi">AVI</option>
+                <option value="mov">MOV</option>
+                <option value="flv">FLV</option>
+              </select>
+            </div>
+            <div class="field" style="flex:1">
+              <label>Quality</label>
+              <select class="input" id="v-quality">
+                <option value="best">Best Available</option>
+                <option value="4k">4K (2160p)</option>
+                <option value="1080p">1080p Full HD</option>
+                <option value="720p">720p HD</option>
+                <option value="480p">480p</option>
+                <option value="360p">360p</option>
+              </select>
+            </div>
+          </div>
         </div>
-        <div class="result-actions">
-          <!-- PRIMARY: direct browser download -->
-          <button class="btn-download" id="blur-download-btn" onclick="downloadEnhancedVideo()">
-            ⬇️ Download Enhanced Video
-          </button>
-          <!-- SECONDARY: open folder -->
-          <button class="btn btn-secondary" id="blur-open-folder-btn" onclick="openFolder('')">
-            📂 Open Folder
-          </button>
-          <!-- RESET -->
-          <button class="btn btn-secondary" onclick="resetBlurEnhancer()">
-            🔄 Enhance Another Video
-          </button>
-        </div>
-      </div>
 
-      <!-- START BUTTON -->
-      <div id="blur-start-wrap" style="margin-top:8px">
-        <button class="btn btn-primary" id="blur-start-btn"
-                style="width:100%;justify-content:center;padding:14px;font-size:15px"
-                onclick="startBlurEnhance()">
-          ✨ Enhance Video Quality
+        <!-- Subtitles -->
+        <div class="card">
+          <div class="card-title"><span>💬</span> Subtitles / Language</div>
+          <div class="input-row">
+            <div class="field" style="flex:1">
+              <label>Subtitle Language</label>
+              <select class="input" id="v-sublang">
+                <option value="none">None</option>
+                <option value="en">English</option>
+                <option value="ur">Urdu</option>
+                <option value="hi">Hindi</option>
+                <option value="ar">Arabic</option>
+                <option value="fr">French</option>
+                <option value="es">Spanish</option>
+                <option value="de">German</option>
+              </select>
+            </div>
+            <div class="field" style="flex:1; display:flex; align-items:flex-end; gap:16px; padding-bottom:2px">
+              <label class="check-wrap">
+                <input type="checkbox" id="v-embedsubs"> Embed subtitles into video
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Enhancement -->
+        <div class="card">
+          <div class="card-title"><span>✨</span> Video Enhancement</div>
+          <label class="toggle-wrap">
+            <span class="toggle">
+              <input type="checkbox" id="v-enhance">
+              <div class="toggle-track"></div>
+              <div class="toggle-thumb"></div>
+            </span>
+            <span style="font-size:13.5px; font-family:var(--font-body)">Enhance after download (FFmpeg sharpening + upscale)</span>
+          </label>
+          <div id="v-enhance-opts" style="display:none; margin-top:12px">
+            <label class="check-wrap">
+              <input type="checkbox" id="v-keep-orig" checked> Keep original file alongside enhanced version
+            </label>
+          </div>
+        </div>
+
+        <div id="video-progress-area"></div>
+
+        <button id="video-download-btn"
+                class="btn btn-primary"
+                style="width:100%; justify-content:center; padding:14px; font-size:15px"
+                onclick="startVideoDownload()">
+          ⬇️ Download Videos
         </button>
-      </div>
-    </div>
 
-    <!-- HISTORY -->
-    <div id="tab-history" class="tab-panel">
-      <div class="section-header">🕓 Download History</div>
-      <div class="section-sub">Session history — clears on page refresh</div>
-      <div class="card" style="padding:0">
-        <div id="history-list" style="min-height:100px">
-          <div style="padding:50px;text-align:center;color:var(--text2);font-family:var(--font-body)">No downloads yet this session.</div>
+      </div>
+
+      <!-- ──────────────────────────────────────
+           TAB: AUDIO DOWNLOADER
+      ────────────────────────────────────────── -->
+      <div id="tab-audio" class="tab-panel">
+
+        <div class="hero-accent">
+          <div class="section-header">🎵 Audio Downloader</div>
+          <div class="section-sub">Extract audio from any video URL — music, podcasts, speeches and more</div>
+        </div>
+
+        <!-- URLs -->
+        <div class="card">
+          <div class="card-title"><span>🔗</span> Audio / Video URLs</div>
+          <div id="audio-urls"></div>
+          <button class="btn btn-secondary btn-sm" onclick="addUrlField('audio-urls','audio')">＋ Add Another Link</button>
+        </div>
+
+        <!-- Settings -->
+        <div class="card">
+          <div class="card-title"><span>⚙️</span> Audio Settings</div>
+          <div class="input-row">
+            <div class="field" style="flex:1">
+              <label>Format</label>
+              <select class="input" id="a-format">
+                <option value="mp3">MP3</option>
+                <option value="aac">AAC</option>
+                <option value="flac">FLAC</option>
+                <option value="wav">WAV</option>
+                <option value="ogg">OGG</option>
+                <option value="m4a">M4A</option>
+                <option value="opus">OPUS</option>
+              </select>
+            </div>
+            <div class="field" style="flex:1">
+              <label>Quality / Bitrate</label>
+              <select class="input" id="a-quality">
+                <option value="320">320 kbps (Best)</option>
+                <option value="256">256 kbps</option>
+                <option value="192">192 kbps</option>
+                <option value="128">128 kbps</option>
+                <option value="64">64 kbps</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div id="audio-progress-area"></div>
+
+        <button class="btn btn-primary"
+                style="width:100%; justify-content:center; padding:14px; font-size:15px"
+                onclick="startAudioDownload()">
+          🎵 Download Audio
+        </button>
+
+      </div>
+
+      <!-- ──────────────────────────────────────
+           TAB: VIDEO TO AUDIO (CONVERT)
+      ────────────────────────────────────────── -->
+      <div id="tab-convert" class="tab-panel">
+
+        <div class="hero-accent">
+          <div class="section-header">🔄 Video to Audio</div>
+          <div class="section-sub">Upload a video file or paste a URL to extract audio</div>
+        </div>
+
+        <!-- Input -->
+        <div class="card">
+          <div class="card-title"><span>📁</span> Input — Upload File or Paste URL</div>
+
+          <div id="convert-dropzone"
+               class="dropzone"
+               onclick="document.getElementById('convert-file').click()"
+               ondragover="dragOver(event,'convert-dropzone')"
+               ondragleave="dragLeave(event,'convert-dropzone')"
+               ondrop="dropFile(event)">
+            <div class="drop-icon">📁</div>
+            <p>Drag &amp; Drop video file here</p>
+            <div class="drop-note">Supports: MP4, MKV, AVI, MOV, WEBM, FLV, WMV</div>
+            <div style="margin-top:12px; font-size:13px; color:var(--text3); font-family:var(--font-body)">or click to browse</div>
+          </div>
+
+          <input type="file" id="convert-file"
+                 accept=".mp4,.mkv,.avi,.mov,.webm,.flv,.wmv"
+                 style="display:none"
+                 onchange="fileSelected(this)" />
+
+          <div id="convert-file-info"
+               style="display:none; margin-top:10px; padding:12px; background:var(--surface2); border-radius:9px; font-size:13px; border:1px solid var(--border); font-family:var(--font-body)">
+          </div>
+
+          <div class="divider" style="margin:18px 0; text-align:center; position:relative">
+            <span style="background:var(--surface); padding:0 14px; color:var(--text2); font-size:12px; font-weight:600; position:relative; z-index:1; letter-spacing:.5px; font-family:var(--font-body)">OR</span>
+          </div>
+
+          <div class="field">
+            <label>Paste Online Video URL</label>
+            <input class="input" id="convert-url" placeholder="https://youtube.com/watch?v=..." />
+          </div>
+        </div>
+
+        <!-- Output Settings -->
+        <div class="card">
+          <div class="card-title"><span>⚙️</span> Output Settings</div>
+          <div class="input-row">
+            <div class="field" style="flex:1">
+              <label>Output Format</label>
+              <select class="input" id="c-format">
+                <option value="mp3">MP3</option>
+                <option value="aac">AAC</option>
+                <option value="flac">FLAC</option>
+                <option value="wav">WAV</option>
+                <option value="ogg">OGG</option>
+                <option value="m4a">M4A</option>
+              </select>
+            </div>
+            <div class="field" style="flex:1">
+              <label>Quality</label>
+              <select class="input" id="c-quality">
+                <option value="320">320 kbps</option>
+                <option value="256">256 kbps</option>
+                <option value="192">192 kbps</option>
+                <option value="128">128 kbps</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label>Output Filename (optional)</label>
+            <input class="input" id="c-rename" placeholder="Leave empty to use original name" />
+          </div>
+        </div>
+
+        <div id="convert-progress-area"></div>
+
+        <button class="btn btn-primary"
+                style="width:100%; justify-content:center; padding:14px; font-size:15px"
+                onclick="startConvert()">
+          🔄 Convert to Audio
+        </button>
+
+      </div>
+
+      <!-- ──────────────────────────────────────
+           TAB: PLAYLIST DOWNLOADER
+      ────────────────────────────────────────── -->
+      <div id="tab-playlist" class="tab-panel">
+
+        <div class="hero-accent">
+          <div class="section-header">📋 Playlist Downloader</div>
+          <div class="section-sub">Download entire YouTube playlists or channels with one click</div>
+        </div>
+
+        <!-- URL fetch -->
+        <div class="card">
+          <div class="card-title"><span>🔗</span> Playlist or Channel URL</div>
+          <div style="display:flex; gap:10px">
+            <input class="input" id="playlist-url" placeholder="Paste YouTube playlist or channel URL..." style="flex:1" />
+            <button class="btn btn-secondary" onclick="fetchPlaylist()">
+              <span id="pl-btn-txt">🔍 Fetch</span>
+            </button>
+          </div>
+          <div id="playlist-info" style="display:none; margin-top:14px"></div>
+        </div>
+
+        <!-- Video list -->
+        <div id="playlist-videos-card" style="display:none" class="card">
+          <div class="card-title"><span>📋</span> Videos</div>
+          <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm" onclick="selectAllPlaylist(true)">✅ Select All</button>
+            <button class="btn btn-secondary btn-sm" onclick="selectAllPlaylist(false)">☐ Deselect All</button>
+            <div style="display:flex; gap:8px; align-items:center; margin-left:auto">
+              <span style="font-size:12px; color:var(--text2); font-family:var(--font-body)">Range:</span>
+              <input class="input" id="pl-range-from" placeholder="From #" style="width:70px" />
+              <span style="font-size:12px; color:var(--text2); font-family:var(--font-body)">to</span>
+              <input class="input" id="pl-range-to"   placeholder="To #"   style="width:70px" />
+              <button class="btn btn-secondary btn-sm" onclick="applyRange()">Apply</button>
+            </div>
+          </div>
+          <div id="playlist-video-list" style="max-height:380px; overflow-y:auto; border:1px solid var(--border); border-radius:9px"></div>
+          <div class="playlist-count-info" id="pl-selected-count" style="margin-top:10px"></div>
+        </div>
+
+        <!-- Download settings -->
+        <div id="playlist-settings-card" style="display:none" class="card">
+          <div class="card-title"><span>⚙️</span> Download Settings</div>
+          <div class="input-row">
+            <div class="field" style="flex:1">
+              <label>Format</label>
+              <select class="input" id="pl-format">
+                <option value="mp4">MP4</option>
+                <option value="mkv">MKV</option>
+                <option value="webm">WEBM</option>
+              </select>
+            </div>
+            <div class="field" style="flex:1">
+              <label>Quality</label>
+              <select class="input" id="pl-quality">
+                <option value="best">Best</option>
+                <option value="1080p">1080p</option>
+                <option value="720p">720p</option>
+                <option value="480p">480p</option>
+              </select>
+            </div>
+            <div class="field" style="flex:1">
+              <label>Subtitle Language</label>
+              <select class="input" id="pl-sublang">
+                <option value="none">None</option>
+                <option value="en">English</option>
+                <option value="ur">Urdu</option>
+                <option value="hi">Hindi</option>
+              </select>
+            </div>
+          </div>
+          <label class="check-wrap">
+            <input type="checkbox" id="pl-skip-dl"> Skip already downloaded videos
+          </label>
+        </div>
+
+        <div id="playlist-progress-area"></div>
+
+        <button id="pl-download-btn"
+                style="display:none; width:100%"
+                class="btn btn-primary"
+                onclick="startPlaylistDownload()">
+          ⬇️ Download Selected
+        </button>
+
+      </div>
+
+      <!-- ──────────────────────────────────────
+           TAB: IMAGE DOWNLOADER
+      ────────────────────────────────────────── -->
+      <div id="tab-images" class="tab-panel">
+
+        <div class="hero-accent">
+          <div class="section-header">🖼️ Image Downloader</div>
+          <div class="section-sub">Download images directly or extract all images from any webpage</div>
+        </div>
+
+        <!-- URLs -->
+        <div class="card">
+          <div class="card-title"><span>🔗</span> Image / Webpage URLs</div>
+          <div id="image-urls"></div>
+          <button class="btn btn-secondary btn-sm" onclick="addUrlField('image-urls','image')">＋ Add Another URL</button>
+          <p style="font-size:12px; color:var(--text2); margin-top:10px; font-family:var(--font-body)">
+            💡 Paste a <strong>webpage URL</strong> to extract all images, or paste a <strong>direct image URL</strong>
+          </p>
+          <button class="btn btn-secondary" style="margin-top:10px" onclick="extractImages()">🔍 Extract Images from Page</button>
+        </div>
+
+        <!-- Image grid -->
+        <div id="image-grid-card" style="display:none" class="card">
+          <div class="card-title"><span>🖼️</span> Found Images</div>
+          <div style="display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap">
+            <button class="btn btn-secondary btn-sm" onclick="selectAllImages(true)">✅ Select All</button>
+            <button class="btn btn-secondary btn-sm" onclick="selectAllImages(false)">☐ Deselect All</button>
+            <span id="img-selected-count" style="font-size:12px; color:var(--text2); display:flex; align-items:center; margin-left:auto; font-family:var(--font-body)"></span>
+          </div>
+          <div id="image-thumb-grid" class="thumb-grid"></div>
+        </div>
+
+        <!-- Save settings -->
+        <div class="card">
+          <div class="card-title"><span>⚙️</span> Save Settings</div>
+          <div class="input-row">
+            <div class="field" style="flex:1">
+              <label>Save Format</label>
+              <select class="input" id="img-format">
+                <option value="jpg">JPG</option>
+                <option value="png">PNG</option>
+                <option value="webp">WEBP</option>
+                <option value="gif">GIF</option>
+                <option value="bmp">BMP</option>
+              </select>
+            </div>
+            <div class="field" style="flex:1">
+              <label>Rename Prefix (auto-numbered)</label>
+              <input class="input" id="img-rename" placeholder="e.g. photo → photo_001.jpg" />
+            </div>
+          </div>
+          <label class="check-wrap" style="margin-top:8px">
+            <input type="checkbox" id="img-zip" checked> Download as ZIP archive
+          </label>
+        </div>
+
+        <div id="images-progress-area"></div>
+
+        <button class="btn btn-primary"
+                style="width:100%; justify-content:center; padding:14px; font-size:15px"
+                onclick="downloadImages()">
+          ⬇️ Download Images
+        </button>
+
+      </div>
+
+      <!-- ──────────────────────────────────────
+           TAB: BLUR ENHANCER
+      ────────────────────────────────────────── -->
+      <div id="tab-blur" class="tab-panel">
+
+        <div class="hero-accent" style="background:linear-gradient(135deg,rgba(74,140,122,0.08),rgba(58,110,94,0.06)); border-color:rgba(74,140,122,0.2)">
+          <div class="section-header">✨ Blur → High Quality</div>
+          <div class="section-sub">Upload your blurry or low-quality video. We'll sharpen, denoise, boost contrast and upscale it using real FFmpeg processing — not AI cartoonish effects.</div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap">
+            <span class="quality-badge badge-before">Before: Blurry / Low-res</span>
+            <span style="display:flex; align-items:center; font-size:14px">→</span>
+            <span class="quality-badge badge-after">After: Sharp &amp; Natural HD</span>
+          </div>
+        </div>
+
+        <!-- Upload -->
+        <div class="card" id="blur-upload-card">
+          <div class="card-title"><span>📁</span> Upload Your Video</div>
+
+          <div id="blur-dropzone"
+               class="enhance-dropzone"
+               onclick="document.getElementById('blur-file-input').click()"
+               ondragover="blurDragOver(event)"
+               ondragleave="blurDragLeave(event)"
+               ondrop="blurDropFile(event)">
+            <span class="enhance-drop-icon">🎞️</span>
+            <p style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px; font-family:var(--font-body)">Drag &amp; Drop your blurry video here</p>
+            <div style="font-size:13px; color:var(--text2); font-family:var(--font-body)">Supports: MP4, MKV, AVI, MOV, WEBM, FLV, WMV</div>
+            <div class="drop-note" style="margin-top:10px">or click to browse files</div>
+          </div>
+
+          <input type="file" id="blur-file-input"
+                 accept=".mp4,.mkv,.avi,.mov,.webm,.flv,.wmv"
+                 style="display:none"
+                 onchange="blurFileSelected(this)" />
+
+          <div id="blur-file-info"
+               style="display:none; margin-top:12px; padding:12px 16px; background:var(--surface2); border-radius:10px; font-size:13px; border:1px solid var(--border); display:flex; align-items:center; gap:10px; font-family:var(--font-body)">
+            <span style="font-size:22px">🎞️</span>
+            <div id="blur-file-details"></div>
+          </div>
+        </div>
+
+        <!-- Enhancement Settings -->
+        <div class="card" id="blur-settings-card">
+          <div class="card-title"><span>⚙️</span> Enhancement Settings</div>
+          <div class="input-row">
+            <div class="field" style="flex:1">
+              <label>Enhancement Level</label>
+              <select class="input" id="blur-level">
+                <option value="light">Light — Subtle sharpening only</option>
+                <option value="medium" selected>Medium — Balanced (recommended)</option>
+                <option value="strong">Strong — Max sharpening + full denoise</option>
+              </select>
+            </div>
+            <div class="field" style="flex:1">
+              <label>Target Resolution</label>
+              <select class="input" id="blur-res">
+                <option value="auto">Auto (Best fit)</option>
+                <option value="720p">720p HD</option>
+                <option value="1080p">1080p Full HD</option>
+                <option value="original">Keep Original Size</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label>Output Format</label>
+            <select class="input" id="blur-format" style="max-width:220px">
+              <option value="mp4">MP4 (Recommended)</option>
+              <option value="mkv">MKV</option>
+              <option value="mov">MOV</option>
+            </select>
+          </div>
+          <label class="check-wrap" style="margin-top:6px">
+            <input type="checkbox" id="blur-keep-orig" checked>
+            Keep original file alongside enhanced version
+          </label>
+        </div>
+
+        <!-- Processing Progress Box -->
+        <div class="enhance-processing-box" id="blur-processing-box">
+
+          <div style="text-align:center; margin-bottom:24px">
+            <svg width="110" height="110" viewBox="0 0 110 110" style="display:block; margin:0 auto">
+              <defs>
+                <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%"   stop-color="#4a8c7a" />
+                  <stop offset="100%" stop-color="#3a6e5e" />
+                </linearGradient>
+              </defs>
+              <circle class="ring-bg"   cx="55" cy="55" r="45" />
+              <circle class="ring-fill" id="blur-ring" cx="55" cy="55" r="45" />
+            </svg>
+            <div style="margin-top:-95px; height:95px; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none">
+              <div id="blur-pct-text" style="font-family:var(--font-display); font-size:22px; font-weight:700; color:var(--accent)">0%</div>
+              <div style="font-size:10px; color:var(--text2); font-family:var(--font-body); letter-spacing:0.5px">processing</div>
+            </div>
+          </div>
+
+          <div style="text-align:center; margin-bottom:20px">
+            <div id="blur-stage-label" style="font-family:var(--font-display); font-size:20px; font-weight:600; margin-bottom:4px">Uploading video...</div>
+            <div id="blur-stage-sub"   style="font-size:13px; color:var(--text2); font-family:var(--font-body)">Please wait</div>
+          </div>
+
+          <div style="background:var(--surface2); border-radius:10px; padding:16px">
+            <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text2); margin-bottom:8px; font-family:var(--font-body)">
+              <span>Enhancement Progress</span>
+              <span id="blur-bar-pct-text">0%</span>
+            </div>
+            <div class="progress-bar-wrap" style="height:8px">
+              <div class="progress-bar enhancing" id="blur-prog-bar" style="width:0%"></div>
+            </div>
+            <div style="display:flex; gap:16px; margin-top:10px; font-size:11.5px; color:var(--text2); font-family:var(--font-body)">
+              <span id="blur-speed-text">⚡ —</span>
+              <span id="blur-eta-text">⏱️ ETA: —</span>
+              <span id="blur-elapsed-text">🕐 0s</span>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:center; margin-top:16px">
+            <button class="btn btn-danger btn-sm" onclick="cancelBlurEnhance()">⏹ Cancel</button>
+          </div>
+
+        </div>
+
+        <!-- Result Box -->
+        <div class="enhance-result-box" id="blur-result-box">
+          <span class="result-icon">🎉</span>
+          <div class="result-title">Enhancement Complete!</div>
+          <div class="result-sub" id="blur-result-sub">
+            Your video has been sharpened, denoised and upscaled successfully.<br>
+            Click below to save it to your computer.
+          </div>
+          <div class="result-actions">
+            <button class="btn-download" id="blur-download-btn" onclick="downloadEnhancedVideo()">⬇️ Download Enhanced Video</button>
+            <button class="btn btn-secondary" id="blur-open-folder-btn" onclick="openFolder('')">📂 Open Folder</button>
+            <button class="btn btn-secondary" onclick="resetBlurEnhancer()">🔄 Enhance Another Video</button>
+          </div>
+        </div>
+
+        <!-- Start Button -->
+        <div id="blur-start-wrap" style="margin-top:8px">
+          <button class="btn btn-primary"
+                  id="blur-start-btn"
+                  style="width:100%; justify-content:center; padding:14px; font-size:15px"
+                  onclick="startBlurEnhance()">
+            ✨ Enhance Video Quality
+          </button>
+        </div>
+
+      </div>
+
+      <!-- ──────────────────────────────────────
+           TAB: HISTORY
+      ────────────────────────────────────────── -->
+      <div id="tab-history" class="tab-panel">
+        <div class="section-header">🕓 Download History</div>
+        <div class="section-sub">Session history — clears on page refresh</div>
+        <div class="card" style="padding:0">
+          <div id="history-list" style="min-height:100px">
+            <div style="padding:50px; text-align:center; color:var(--text2); font-family:var(--font-body)">No downloads yet this session.</div>
+          </div>
+        </div>
+        <button class="btn btn-danger btn-sm" style="margin-top:14px" onclick="clearHistory()">🗑️ Clear History</button>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /main -->
+
+  <!-- ── TOAST CONTAINER ── -->
+  <div id="toasts"></div>
+
+  <!-- ══════════════════════════════════════════════
+       SETTINGS MODAL
+  ══════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>⚙️ Settings</h3>
+        <button class="btn-icon" onclick="closeSettings()">✕</button>
+      </div>
+
+      <div class="modal-section">
+        <h4>Appearance</h4>
+        <div class="modal-row">
+          <span>Dark / Light Theme</span>
+          <button class="btn btn-secondary btn-sm" onclick="toggleTheme()">Toggle Theme</button>
         </div>
       </div>
-      <button class="btn btn-danger btn-sm" style="margin-top:14px" onclick="clearHistory()">🗑️ Clear History</button>
+
+      <div class="modal-section">
+        <h4>Downloads</h4>
+        <div class="modal-row">
+          <span>Open downloads folder</span>
+          <button class="btn btn-secondary btn-sm" onclick="openFolder('')">📂 Open Folder</button>
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <h4>Maintenance</h4>
+        <div class="modal-row">
+          <span>Update yt-dlp to latest version</span>
+          <button class="btn btn-secondary btn-sm" id="update-btn" onclick="updateYtdlp()">⬆️ Update yt-dlp</button>
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <h4>Privacy</h4>
+        <div class="modal-row"><span>✅ 100% local processing — no data sent externally</span></div>
+        <div class="modal-row"><span>✅ No analytics or tracking</span></div>
+        <div class="modal-row">
+          <span>Clear all session data</span>
+          <button class="btn btn-danger btn-sm"
+                  onclick="clearHistory(); closeSettings(); showToast('All session data cleared','success')">
+            🗑️ Clear Data
+          </button>
+        </div>
+      </div>
+
+      <div id="app-info"
+           style="font-size:12px; color:var(--text2); margin-top:8px; padding-top:12px; border-top:1px solid var(--border); font-family:var(--font-body)">
+      </div>
+
     </div>
-
-  </div><!-- /content -->
-</div><!-- /main -->
-
-<div id="toasts"></div>
-
-<!-- SETTINGS MODAL -->
-<div class="modal-overlay" id="settings-modal">
-  <div class="modal">
-    <div class="modal-header"><h3>⚙️ Settings</h3><button class="btn-icon" onclick="closeSettings()">✕</button></div>
-    <div class="modal-section"><h4>Appearance</h4><div class="modal-row"><span>Dark / Light Theme</span><button class="btn btn-secondary btn-sm" onclick="toggleTheme()">Toggle Theme</button></div></div>
-    <div class="modal-section"><h4>Downloads</h4><div class="modal-row"><span>Open downloads folder</span><button class="btn btn-secondary btn-sm" onclick="openFolder('')">📂 Open Folder</button></div></div>
-    <div class="modal-section"><h4>Maintenance</h4><div class="modal-row"><span>Update yt-dlp to latest version</span><button class="btn btn-secondary btn-sm" id="update-btn" onclick="updateYtdlp()">⬆️ Update yt-dlp</button></div></div>
-    <div class="modal-section"><h4>Privacy</h4>
-      <div class="modal-row"><span>✅ 100% local processing — no data sent externally</span></div>
-      <div class="modal-row"><span>✅ No analytics or tracking</span></div>
-      <div class="modal-row"><span>Clear all session data</span><button class="btn btn-danger btn-sm" onclick="clearHistory();closeSettings();showToast('All session data cleared','success')">🗑️ Clear Data</button></div>
-    </div>
-    <div id="app-info" style="font-size:12px;color:var(--text2);margin-top:8px;padding-top:12px;border-top:1px solid var(--border);font-family:var(--font-body)"></div>
   </div>
-</div>
 
-<script>
-// ─── BACKEND URL (auto-detect local vs deployed) ───
-// When running locally → relative paths (same server serves frontend + backend)
-// When on Vercel → must call Hugging Face backend directly
-const HF_BACKEND = "https://ayesha-ramzan-mediamate-downloader.hf.space";
-const IS_LOCAL   = location.hostname === "localhost" || location.hostname === "127.0.0.1";
-const API_BASE   = IS_LOCAL ? "" : HF_BACKEND;
 
-// ─── STATE ───
-const state = {
-  convertFile: null,
-  playlistVideos: [], playlistName: '',
-  extractedImages: [], selectedImages: new Set(),
-  history: [],
-  blurFile: null,
-  blurJobId: null,      // ← stores the real job id from backend
-  blurFilePath: null,   // ← stores the enhanced file path
-};
+  <!-- ══════════════════════════════════════════════
+       JAVASCRIPT
+  ══════════════════════════════════════════════ -->
+  <script>
 
-// ─── INIT ───
-document.addEventListener('DOMContentLoaded', () => {
-  addUrlField('video-urls','video');
-  addUrlField('audio-urls','audio');
-  addUrlField('image-urls','image');
-  fetchAppInfo();
-  document.getElementById('v-enhance').addEventListener('change', e => {
-    document.getElementById('v-enhance-opts').style.display = e.target.checked ? 'block' : 'none';
-  });
-});
+    /* ─────────────────────────────────────────────
+       CONFIG
+    ───────────────────────────────────────────── */
+    const HF_BACKEND = "https://ayesha-ramzan-mediamate-downloader.hf.space";
+    const IS_LOCAL   = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+    const API_BASE   = IS_LOCAL ? "" : HF_BACKEND;
 
-// ─── TAB SWITCHING ───
-const TAB_TITLES = {
-  home:'🏠 Home', video:'🎬 Video Downloader', audio:'🎵 Audio Downloader',
-  convert:'🔄 Video to Audio', playlist:'📋 Playlist Downloader',
-  images:'🖼️ Image Downloader', blur:'✨ Blur → High Quality', history:'🕓 Download History'
-};
-function switchTab(tab, btn) {
-  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-' + tab).classList.add('active');
-  btn.classList.add('active');
-  document.getElementById('page-title').textContent = TAB_TITLES[tab];
-  closeMobileSidebar();
-}
-function toggleMobileSidebar() { document.getElementById('sidebar').classList.toggle('mobile-open'); document.getElementById('sidebar-overlay').classList.toggle('show'); }
-function closeMobileSidebar() { document.getElementById('sidebar').classList.remove('mobile-open'); document.getElementById('sidebar-overlay').classList.remove('show'); }
-function toggleTheme() { document.body.classList.toggle('dark-mode'); document.querySelector('[title="Toggle Theme"]').textContent = document.body.classList.contains('dark-mode') ? '☀️' : '🌙'; }
 
-// ─── TOAST ───
-const TOAST_ICONS = { success:'✅', error:'❌', info:'ℹ️', warning:'⚠️' };
-function showToast(msg, type='info', duration=4000) {
-  const wrap = document.getElementById('toasts');
-  const t = document.createElement('div');
-  t.className = `toast ${type}`;
-  t.innerHTML = `<span class="toast-icon">${TOAST_ICONS[type]}</span><span>${msg}</span>`;
-  wrap.appendChild(t);
-  setTimeout(() => { t.classList.add('removing'); setTimeout(() => t.remove(), 250); }, duration);
-}
+    /* ─────────────────────────────────────────────
+       STATE
+    ───────────────────────────────────────────── */
+    const state = {
+      convertFile:     null,
+      playlistVideos:  [],
+      playlistName:    '',
+      extractedImages: [],
+      selectedImages:  new Set(),
+      history:         [],
+      blurFile:        null,
+      blurJobId:       null,
+      blurFilePath:    null,
+    };
 
-// ─── URL FIELDS ───
-function addUrlField(containerId, type, value='') {
-  const container = document.getElementById(containerId);
-  const div = document.createElement('div'); div.className = 'url-item';
-  const placeholder = {
-    video:'https://youtube.com/watch?v=... or TikTok, Instagram, Twitter...',
-    audio:'https://youtube.com/watch?v=... paste music/audio URL...',
-    image:'https://example.com or https://example.com/image.jpg'
-  }[type];
-  div.innerHTML = `<input class="input url-input" type="url" placeholder="${placeholder}" value="${value}"/><button class="btn-icon" title="Remove" onclick="this.parentElement.remove()">✕</button>`;
-  container.appendChild(div);
-}
-function getUrlValues(containerId) {
-  return [...document.querySelectorAll(`#${containerId} .url-input`)].map(i => i.value.trim()).filter(Boolean);
-}
 
-// ─── PROGRESS RENDERING ───
-function renderProgress(areaId, job, onDone) {
-  const area = document.getElementById(areaId);
-  let card = area.querySelector(`[data-job="${job.id}"]`);
-  if (!card) { card = document.createElement('div'); card.className = 'progress-card'; card.setAttribute('data-job', job.id); area.appendChild(card); }
-  const pct = job.progress || 0;
-  const barClass = { done:'done', error:'error', enhancing:'enhancing', cancelled:'' }[job.status] || '';
-  const badge = `<span class="status-badge badge-${job.status}">${job.status}</span>`;
-  card.innerHTML = `
-    <div class="progress-header"><span>${job.filename ? '📄 '+job.filename.slice(0,50) : (job.message||'Processing...')}</span>${badge}</div>
-    <div class="progress-bar-wrap"><div class="progress-bar ${barClass}" style="width:${pct}%"></div></div>
-    <div class="progress-meta">
-      <span>📊 ${pct.toFixed(1)}%</span>
-      ${job.speed ? `<span>⚡ ${job.speed}</span>` : ''}
-      ${job.eta ? `<span>⏱️ ETA: ${job.eta}</span>` : ''}
-      ${job.filesize ? `<span>💾 ${job.filesize}</span>` : ''}
-      ${job.error ? `<span style="color:var(--accent3)">❌ ${job.error.slice(0,100)}</span>` : ''}
-    </div>
-    ${job.status!=='done'&&job.status!=='error'&&job.status!=='cancelled' ? `<button class="btn btn-danger btn-sm" style="margin-top:8px" onclick="cancelJob('${job.id}')">⏹ Cancel</button>` : ''}
-    ${job.status==='done'&&job.filepath ? `<button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="openFolder('${job.filepath}')">📂 Open Folder</button>` : ''}
-  `;
-  if (job.status === 'done') { addHistory(job); if (onDone) onDone(job); }
-}
+    /* ─────────────────────────────────────────────
+       INIT
+    ───────────────────────────────────────────── */
+    document.addEventListener('DOMContentLoaded', () => {
+      addUrlField('video-urls', 'video');
+      addUrlField('audio-urls', 'audio');
+      addUrlField('image-urls', 'image');
+      fetchAppInfo();
 
-function triggerBrowserDownload(jobId) {
-  const a = document.createElement('a');
-  a.href = `/api/download-file/${jobId}`;
-  a.setAttribute('download', '');
-  document.body.appendChild(a); a.click(); a.remove();
-}
+      document.getElementById('v-enhance').addEventListener('change', e => {
+        document.getElementById('v-enhance-opts').style.display = e.target.checked ? 'block' : 'none';
+      });
+    });
 
-function listenProgress(jobId, areaId, onDone) {
-  const es = new EventSource(`/api/progress/${jobId}`);
-  es.onmessage = e => {
-    const job = JSON.parse(e.data);
-    renderProgress(areaId, job, onDone);
-    if (['done','error','cancelled'].includes(job.status)) {
-      es.close();
-      if (job.status === 'done') {
-        showToast('Download complete! ✅', 'success');
-        if (job.filepath && job.type !== 'playlist') triggerBrowserDownload(job.id);
+
+    /* ─────────────────────────────────────────────
+       TAB SWITCHING
+    ───────────────────────────────────────────── */
+    const TAB_TITLES = {
+      home:     '🏠 Home',
+      video:    '🎬 Video Downloader',
+      audio:    '🎵 Audio Downloader',
+      convert:  '🔄 Video to Audio',
+      playlist: '📋 Playlist Downloader',
+      images:   '🖼️ Image Downloader',
+      blur:     '✨ Blur → High Quality',
+      history:  '🕓 Download History',
+    };
+
+    function switchTab(tab, btn) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+      document.getElementById('tab-' + tab).classList.add('active');
+      btn.classList.add('active');
+      document.getElementById('page-title').textContent = TAB_TITLES[tab];
+      closeMobileSidebar();
+    }
+
+    function toggleMobileSidebar() {
+      document.getElementById('sidebar').classList.toggle('mobile-open');
+      document.getElementById('sidebar-overlay').classList.toggle('show');
+    }
+
+    function closeMobileSidebar() {
+      document.getElementById('sidebar').classList.remove('mobile-open');
+      document.getElementById('sidebar-overlay').classList.remove('show');
+    }
+
+    function toggleTheme() {
+      document.body.classList.toggle('dark-mode');
+      document.querySelector('[title="Toggle Theme"]').textContent =
+        document.body.classList.contains('dark-mode') ? '☀️' : '🌙';
+    }
+
+
+    /* ─────────────────────────────────────────────
+       TOAST NOTIFICATIONS
+    ───────────────────────────────────────────── */
+    const TOAST_ICONS = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+
+    function showToast(msg, type = 'info', duration = 4000) {
+      const wrap = document.getElementById('toasts');
+      const t    = document.createElement('div');
+      t.className = `toast ${type}`;
+      t.innerHTML = `<span class="toast-icon">${TOAST_ICONS[type]}</span><span>${msg}</span>`;
+      wrap.appendChild(t);
+      setTimeout(() => {
+        t.classList.add('removing');
+        setTimeout(() => t.remove(), 250);
+      }, duration);
+    }
+
+
+    /* ─────────────────────────────────────────────
+       URL FIELD HELPERS
+    ───────────────────────────────────────────── */
+    function addUrlField(containerId, type, value = '') {
+      const container = document.getElementById(containerId);
+      const div       = document.createElement('div');
+      div.className   = 'url-item';
+
+      const placeholder = {
+        video: 'https://youtube.com/watch?v=... or TikTok, Instagram, Twitter...',
+        audio: 'https://youtube.com/watch?v=... paste music/audio URL...',
+        image: 'https://example.com or https://example.com/image.jpg',
+      }[type];
+
+      div.innerHTML = `
+        <input class="input url-input" type="url" placeholder="${placeholder}" value="${value}" />
+        <button class="btn-icon" title="Remove" onclick="this.parentElement.remove()">✕</button>
+      `;
+      container.appendChild(div);
+    }
+
+    function getUrlValues(containerId) {
+      return [...document.querySelectorAll(`#${containerId} .url-input`)]
+        .map(i => i.value.trim())
+        .filter(Boolean);
+    }
+
+
+    /* ─────────────────────────────────────────────
+       PROGRESS RENDERING
+    ───────────────────────────────────────────── */
+    function renderProgress(areaId, job, onDone) {
+      const area = document.getElementById(areaId);
+      let card   = area.querySelector(`[data-job="${job.id}"]`);
+
+      if (!card) {
+        card = document.createElement('div');
+        card.className = 'progress-card';
+        card.setAttribute('data-job', job.id);
+        area.appendChild(card);
       }
-      if (job.status === 'error') showToast(job.error || 'Download failed', 'error');
+
+      const pct      = job.progress || 0;
+      const barClass = { done: 'done', error: 'error', enhancing: 'enhancing', cancelled: '' }[job.status] || '';
+      const badge    = `<span class="status-badge badge-${job.status}">${job.status}</span>`;
+
+      card.innerHTML = `
+        <div class="progress-header">
+          <span>${job.filename ? '📄 ' + job.filename.slice(0, 50) : (job.message || 'Processing...')}</span>
+          ${badge}
+        </div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar ${barClass}" style="width:${pct}%"></div>
+        </div>
+        <div class="progress-meta">
+          <span>📊 ${pct.toFixed(1)}%</span>
+          ${job.speed    ? `<span>⚡ ${job.speed}</span>`          : ''}
+          ${job.eta      ? `<span>⏱️ ETA: ${job.eta}</span>`      : ''}
+          ${job.filesize ? `<span>💾 ${job.filesize}</span>`       : ''}
+          ${job.error    ? `<span style="color:var(--accent3)">❌ ${job.error.slice(0, 100)}</span>` : ''}
+        </div>
+        ${job.status !== 'done' && job.status !== 'error' && job.status !== 'cancelled'
+          ? `<button class="btn btn-danger btn-sm" style="margin-top:8px" onclick="cancelJob('${job.id}')">⏹ Cancel</button>`
+          : ''}
+        ${job.status === 'done' && job.filepath
+          ? `<button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="openFolder('${job.filepath}')">📂 Open Folder</button>`
+          : ''}
+      `;
+
+      if (job.status === 'done') {
+        addHistory(job);
+        if (onDone) onDone(job);
+      }
     }
-  };
-}
 
-// ─── VIDEO DOWNLOAD ───
-async function startVideoDownload() {
-  const urls = getUrlValues('video-urls');
-  if (!urls.length) { showToast('Please enter at least one URL', 'error'); return; }
-  const data = {
-    urls, tab:'video',
-    format: document.getElementById('v-format').value,
-    quality: document.getElementById('v-quality').value,
-    subtitle_lang: document.getElementById('v-sublang').value,
-    embed_subs: document.getElementById('v-embedsubs').checked,
-    enhance: document.getElementById('v-enhance').checked,
-    keep_original: document.getElementById('v-keep-orig').checked
-  };
-  try { showToast('Starting download...','info',2000); const res = await apiFetch('/api/download', data); listenProgress(res.job_id, 'video-progress-area'); }
-  catch(e) { showToast(e.message, 'error'); }
-}
-
-// ─── AUDIO DOWNLOAD ───
-async function startAudioDownload() {
-  const urls = getUrlValues('audio-urls');
-  if (!urls.length) { showToast('Please enter at least one URL', 'error'); return; }
-  const data = { urls, tab:'audio', format: document.getElementById('a-format').value, audio_quality: document.getElementById('a-quality').value };
-  try { showToast('Starting audio download...','info',2000); const res = await apiFetch('/api/download', data); listenProgress(res.job_id, 'audio-progress-area'); }
-  catch(e) { showToast(e.message, 'error'); }
-}
-
-// ─── CONVERT ───
-function dragOver(e, id) { e.preventDefault(); document.getElementById(id).classList.add('dragover'); }
-function dragLeave(e, id) { document.getElementById(id).classList.remove('dragover'); }
-function dropFile(e) { e.preventDefault(); dragLeave(e,'convert-dropzone'); const f = e.dataTransfer.files[0]; if (f) processConvertFile(f); }
-function fileSelected(input) { if (input.files[0]) processConvertFile(input.files[0]); }
-function processConvertFile(file) {
-  state.convertFile = file;
-  const info = document.getElementById('convert-file-info');
-  info.style.display = 'block';
-  info.innerHTML = `📁 <strong>${file.name}</strong> — ${(file.size/1024/1024).toFixed(2)} MB`;
-  document.getElementById('convert-dropzone').querySelector('p').textContent = '✅ ' + file.name;
-}
-async function startConvert() {
-  const url = document.getElementById('convert-url').value.trim();
-  if (!state.convertFile && !url) { showToast('Upload a file or paste a URL', 'error'); return; }
-  const fd = new FormData();
-  if (state.convertFile) fd.append('file', state.convertFile);
-  fd.append('url', url);
-  fd.append('output_format', document.getElementById('c-format').value);
-  fd.append('quality', document.getElementById('c-quality').value);
-  fd.append('rename', document.getElementById('c-rename').value);
-  try {
-    showToast('Starting conversion...','info',2000);
-    const res = await fetch('/api/convert', { method:'POST', body:fd });
-    const data = await res.json();
-    if (data.job_id) listenProgress(data.job_id, 'convert-progress-area');
-    else showToast(data.detail || 'Error', 'error');
-  } catch(e) { showToast(e.message, 'error'); }
-}
-
-// ─── PLAYLIST ───
-async function fetchPlaylist() {
-  const url = document.getElementById('playlist-url').value.trim();
-  if (!url) { showToast('Enter a playlist or channel URL', 'error'); return; }
-  const btn = document.getElementById('pl-btn-txt'); btn.textContent = '⏳ Loading...';
-  try {
-    const data = await apiFetch('/api/playlist-info', { url });
-    state.playlistVideos = data.videos; state.playlistName = data.title;
-    const info = document.getElementById('playlist-info'); info.style.display = 'block';
-    info.innerHTML = `<div style="display:flex;gap:16px;align-items:center;background:var(--surface2);padding:14px;border-radius:10px"><div><div style="font-size:16px;font-weight:700;font-family:var(--font-display)">${escHtml(data.title)}</div><div style="font-size:13px;color:var(--text2);margin-top:4px;font-family:var(--font-body)">${data.uploader?`👤 ${escHtml(data.uploader)} · `:''}📹 ${data.count} videos</div></div></div>`;
-    const list = document.getElementById('playlist-video-list'); list.innerHTML = '';
-    data.videos.forEach((v,i) => {
-      const item = document.createElement('div'); item.className = 'playlist-video-item'; item.setAttribute('data-idx', i);
-      item.innerHTML = `<input type="checkbox" checked style="accent-color:var(--accent);flex-shrink:0" onchange="updatePlCount()"/><img src="${escHtml(v.thumbnail)}" onerror="this.src=''" loading="lazy"/><div class="pv-info"><div class="pv-title">${escHtml(v.title)}</div><div class="pv-dur">${v.duration?formatDuration(v.duration):''}</div></div>`;
-      list.appendChild(item);
-    });
-    updatePlCount();
-    document.getElementById('playlist-videos-card').style.display = 'block';
-    document.getElementById('playlist-settings-card').style.display = 'block';
-    document.getElementById('pl-download-btn').style.display = 'block';
-    showToast(`Found ${data.count} videos`, 'success');
-  } catch(e) { showToast(e.message || 'Failed to fetch playlist', 'error'); }
-  finally { btn.textContent = '🔍 Fetch'; }
-}
-function updatePlCount() {
-  const items = document.querySelectorAll('#playlist-video-list .playlist-video-item');
-  let sel = 0; items.forEach(item => { if (item.querySelector('input[type=checkbox]').checked) sel++; });
-  document.getElementById('pl-selected-count').textContent = `${sel} of ${items.length} videos selected`;
-}
-function selectAllPlaylist(val) { document.querySelectorAll('#playlist-video-list input[type=checkbox]').forEach(cb => cb.checked = val); updatePlCount(); }
-function applyRange() {
-  const from = parseInt(document.getElementById('pl-range-from').value)||1;
-  const to = parseInt(document.getElementById('pl-range-to').value)||9999;
-  document.querySelectorAll('#playlist-video-list .playlist-video-item').forEach((item,i) => { item.querySelector('input[type=checkbox]').checked = (i+1)>=from && (i+1)<=to; });
-  updatePlCount();
-}
-async function startPlaylistDownload() {
-  const items = document.querySelectorAll('#playlist-video-list .playlist-video-item');
-  const urls = []; items.forEach((item,i) => { if (item.querySelector('input[type=checkbox]').checked) urls.push(state.playlistVideos[i].url); });
-  if (!urls.length) { showToast('Select at least one video', 'error'); return; }
-  const data = { urls, playlist_name:state.playlistName, format:document.getElementById('pl-format').value, quality:document.getElementById('pl-quality').value, subtitle_lang:document.getElementById('pl-sublang').value, skip_downloaded:document.getElementById('pl-skip-dl').checked };
-  try { showToast(`Starting download of ${urls.length} videos...`,'info',3000); const res = await apiFetch('/api/playlist-download', data); listenProgress(res.job_id, 'playlist-progress-area'); }
-  catch(e) { showToast(e.message, 'error'); }
-}
-
-// ─── IMAGES ───
-async function extractImages() {
-  const urls = getUrlValues('image-urls');
-  if (!urls.length) { showToast('Enter a webpage URL', 'error'); return; }
-  showToast('Scanning page for images...','info',2000);
-  try {
-    const data = await apiFetch('/api/extract-images', { url:urls[0] });
-    state.extractedImages = data.images; state.selectedImages = new Set(data.images.map((_,i)=>i));
-    const grid = document.getElementById('image-thumb-grid'); grid.innerHTML = '';
-    data.images.forEach((img,i) => {
-      const div = document.createElement('div'); div.className = 'thumb-item selected'; div.setAttribute('data-idx', i);
-      div.onclick = () => toggleImageSelect(div, i);
-      div.innerHTML = `<img src="${escHtml(img.url)}" loading="lazy" onerror="this.src=''" title="${escHtml(img.alt||'')}"/><div class="thumb-check">✓</div><div class="thumb-info">${img.width&&img.height?img.width+'×'+img.height:'Image'}</div>`;
-      grid.appendChild(div);
-    });
-    document.getElementById('image-grid-card').style.display = 'block';
-    updateImgCount(); showToast(`Found ${data.count} images`, 'success');
-  } catch(e) { showToast(e.message || 'Failed to extract images', 'error'); }
-}
-function toggleImageSelect(div, idx) { if (state.selectedImages.has(idx)) { state.selectedImages.delete(idx); div.classList.remove('selected'); } else { state.selectedImages.add(idx); div.classList.add('selected'); } updateImgCount(); }
-function selectAllImages(val) { document.querySelectorAll('#image-thumb-grid .thumb-item').forEach((div,i) => { if (val) { state.selectedImages.add(i); div.classList.add('selected'); } else { state.selectedImages.delete(i); div.classList.remove('selected'); } }); updateImgCount(); }
-function updateImgCount() { document.getElementById('img-selected-count').textContent = `${state.selectedImages.size} of ${state.extractedImages.length} selected`; }
-async function downloadImages() {
-  let urls = [];
-  if (state.extractedImages.length) [...state.selectedImages].forEach(i => urls.push(state.extractedImages[i].url));
-  else urls = getUrlValues('image-urls').filter(Boolean);
-  if (!urls.length) { showToast('No images selected', 'error'); return; }
-  const data = { urls, format:document.getElementById('img-format').value, rename_prefix:document.getElementById('img-rename').value||'image', as_zip:document.getElementById('img-zip').checked };
-  try { showToast(`Downloading ${urls.length} images...`,'info',2000); const res = await apiFetch('/api/download-images', data); listenProgress(res.job_id, 'images-progress-area'); }
-  catch(e) { showToast(e.message, 'error'); }
-}
-
-// ════════════════════════════════════════════
-//   BLUR ENHANCER — REAL FFmpeg via backend
-// ════════════════════════════════════════════
-function blurDragOver(e) { e.preventDefault(); document.getElementById('blur-dropzone').classList.add('dragover'); }
-function blurDragLeave(e) { document.getElementById('blur-dropzone').classList.remove('dragover'); }
-function blurDropFile(e) { e.preventDefault(); blurDragLeave(e); const f = e.dataTransfer.files[0]; if (f) blurProcessFile(f); }
-function blurFileSelected(input) { if (input.files[0]) blurProcessFile(input.files[0]); }
-function blurProcessFile(file) {
-  state.blurFile = file;
-  const info = document.getElementById('blur-file-info');
-  info.style.display = 'flex';
-  document.getElementById('blur-file-details').innerHTML =
-    `<div style="font-weight:600;font-family:var(--font-body)">${escHtml(file.name)}</div>
-     <div style="font-size:12px;color:var(--text2);margin-top:2px;font-family:var(--font-body)">${(file.size/1024/1024).toFixed(2)} MB · ${file.type||'video'}</div>`;
-  document.getElementById('blur-dropzone').querySelector('p').textContent = '✅ ' + file.name;
-  showToast('Video loaded! Ready to enhance.', 'success', 2500);
-}
-
-async function startBlurEnhance() {
-  if (!state.blurFile) { showToast('Please upload a video file first', 'error'); return; }
-
-  // Dim cards, hide start button, show processing
-  document.getElementById('blur-upload-card').style.opacity = '0.4';
-  document.getElementById('blur-settings-card').style.opacity = '0.4';
-  document.getElementById('blur-start-wrap').style.display = 'none';
-  document.getElementById('blur-result-box').classList.remove('show');
-  const proc = document.getElementById('blur-processing-box');
-  proc.style.display = 'block'; proc.classList.add('show');
-
-  // Reset ring
-  setBlurRing(0); setBlurLabel('Uploading video...', 'Sending to FFmpeg pipeline');
-
-  // Build form data and POST to /api/enhance
-  const fd = new FormData();
-  fd.append('file', state.blurFile);
-  fd.append('level', document.getElementById('blur-level').value);
-  fd.append('resolution', document.getElementById('blur-res').value);
-  fd.append('output_format', document.getElementById('blur-format').value);
-  fd.append('keep_original', document.getElementById('blur-keep-orig').checked ? '1' : '0');
-
-  let res;
-  try {
-    res = await fetch('/api/enhance', { method:'POST', body:fd });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.detail || 'Upload failed');
-    state.blurJobId = data.job_id;
-  } catch(e) {
-    showToast(e.message, 'error');
-    resetBlurUI(); return;
-  }
-
-  // Now poll SSE progress
-  const es = new EventSource(`/api/progress/${state.blurJobId}`);
-  const startTime = Date.now();
-
-  es.onmessage = e => {
-    const job = JSON.parse(e.data);
-    const pct = job.progress || 0;
-    setBlurRing(pct);
-    document.getElementById('blur-pct-text').textContent = pct + '%';
-    document.getElementById('blur-bar-pct-text').textContent = pct + '%';
-    document.getElementById('blur-prog-bar').style.width = pct + '%';
-
-    const elapsed = Math.round((Date.now() - startTime) / 1000);
-    document.getElementById('blur-elapsed-text').textContent = `🕐 ${elapsed}s`;
-    if (job.speed) document.getElementById('blur-speed-text').textContent = `⚡ ${job.speed}`;
-    if (job.eta)   document.getElementById('blur-eta-text').textContent   = `⏱️ ETA: ${job.eta}`;
-
-    // Stage labels based on progress
-    if (pct < 10)       setBlurLabel('Uploading & analyzing...', 'Reading codec and frame data');
-    else if (pct < 25)  setBlurLabel('Applying sharpening...', 'Unsharp mask & edge enhancement');
-    else if (pct < 45)  setBlurLabel('Reducing noise...', 'Temporal + spatial denoise pass');
-    else if (pct < 65)  setBlurLabel('Boosting contrast...', 'Histogram & gamma correction');
-    else if (pct < 80)  setBlurLabel('Upscaling resolution...', 'Bicubic upscale to target resolution');
-    else if (pct < 95)  setBlurLabel('Re-encoding video...', 'H.264 high quality preset');
-    else                setBlurLabel('Finalizing...', 'Muxing audio + video streams');
-
-    if (job.status === 'done') {
-      es.close();
-      state.blurFilePath = job.filepath;
-      blurEnhanceDone(job);
+    function triggerBrowserDownload(jobId) {
+      const a = document.createElement('a');
+      a.href = `/api/download-file/${jobId}`;
+      a.setAttribute('download', '');
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
     }
-    if (job.status === 'error') {
-      es.close();
-      showToast(job.error || 'Enhancement failed', 'error');
+
+    function listenProgress(jobId, areaId, onDone) {
+      const es = new EventSource(`/api/progress/${jobId}`);
+
+      es.onmessage = e => {
+        const job = JSON.parse(e.data);
+        renderProgress(areaId, job, onDone);
+
+        if (['done', 'error', 'cancelled'].includes(job.status)) {
+          es.close();
+          if (job.status === 'done') {
+            showToast('Download complete! ✅', 'success');
+            if (job.filepath && job.type !== 'playlist') triggerBrowserDownload(job.id);
+          }
+          if (job.status === 'error') showToast(job.error || 'Download failed', 'error');
+        }
+      };
+    }
+
+
+    /* ─────────────────────────────────────────────
+       VIDEO DOWNLOAD
+    ───────────────────────────────────────────── */
+    async function startVideoDownload() {
+      const urls = getUrlValues('video-urls');
+      if (!urls.length) { showToast('Please enter at least one URL', 'error'); return; }
+
+      const data = {
+        urls,
+        tab:           'video',
+        format:        document.getElementById('v-format').value,
+        quality:       document.getElementById('v-quality').value,
+        subtitle_lang: document.getElementById('v-sublang').value,
+        embed_subs:    document.getElementById('v-embedsubs').checked,
+        enhance:       document.getElementById('v-enhance').checked,
+        keep_original: document.getElementById('v-keep-orig').checked,
+      };
+
+      try {
+        showToast('Starting download...', 'info', 2000);
+        const res = await apiFetch('/api/download', data);
+        listenProgress(res.job_id, 'video-progress-area');
+      } catch(e) {
+        showToast(e.message, 'error');
+      }
+    }
+
+
+    /* ─────────────────────────────────────────────
+       AUDIO DOWNLOAD
+    ───────────────────────────────────────────── */
+    async function startAudioDownload() {
+      const urls = getUrlValues('audio-urls');
+      if (!urls.length) { showToast('Please enter at least one URL', 'error'); return; }
+
+      const data = {
+        urls,
+        tab:           'audio',
+        format:        document.getElementById('a-format').value,
+        audio_quality: document.getElementById('a-quality').value,
+      };
+
+      try {
+        showToast('Starting audio download...', 'info', 2000);
+        const res = await apiFetch('/api/download', data);
+        listenProgress(res.job_id, 'audio-progress-area');
+      } catch(e) {
+        showToast(e.message, 'error');
+      }
+    }
+
+
+    /* ─────────────────────────────────────────────
+       VIDEO → AUDIO CONVERT
+    ───────────────────────────────────────────── */
+    function dragOver(e, id)  { e.preventDefault(); document.getElementById(id).classList.add('dragover'); }
+    function dragLeave(e, id) { document.getElementById(id).classList.remove('dragover'); }
+
+    function dropFile(e) {
+      e.preventDefault();
+      dragLeave(e, 'convert-dropzone');
+      const f = e.dataTransfer.files[0];
+      if (f) processConvertFile(f);
+    }
+
+    function fileSelected(input) {
+      if (input.files[0]) processConvertFile(input.files[0]);
+    }
+
+    function processConvertFile(file) {
+      state.convertFile = file;
+      const info = document.getElementById('convert-file-info');
+      info.style.display = 'block';
+      info.innerHTML = `📁 <strong>${file.name}</strong> — ${(file.size / 1024 / 1024).toFixed(2)} MB`;
+      document.getElementById('convert-dropzone').querySelector('p').textContent = '✅ ' + file.name;
+    }
+
+    async function startConvert() {
+      const url = document.getElementById('convert-url').value.trim();
+      if (!state.convertFile && !url) { showToast('Upload a file or paste a URL', 'error'); return; }
+
+      const fd = new FormData();
+      if (state.convertFile) fd.append('file', state.convertFile);
+      fd.append('url',           url);
+      fd.append('output_format', document.getElementById('c-format').value);
+      fd.append('quality',       document.getElementById('c-quality').value);
+      fd.append('rename',        document.getElementById('c-rename').value);
+
+      try {
+        showToast('Starting conversion...', 'info', 2000);
+        const res  = await fetch('/api/convert', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (data.job_id) listenProgress(data.job_id, 'convert-progress-area');
+        else showToast(data.detail || 'Error', 'error');
+      } catch(e) {
+        showToast(e.message, 'error');
+      }
+    }
+
+
+    /* ─────────────────────────────────────────────
+       PLAYLIST
+    ───────────────────────────────────────────── */
+    async function fetchPlaylist() {
+      const url = document.getElementById('playlist-url').value.trim();
+      if (!url) { showToast('Enter a playlist or channel URL', 'error'); return; }
+
+      const btn = document.getElementById('pl-btn-txt');
+      btn.textContent = '⏳ Loading...';
+
+      try {
+        const data = await apiFetch('/api/playlist-info', { url });
+        state.playlistVideos = data.videos;
+        state.playlistName   = data.title;
+
+        const info = document.getElementById('playlist-info');
+        info.style.display = 'block';
+        info.innerHTML = `
+          <div style="display:flex; gap:16px; align-items:center; background:var(--surface2); padding:14px; border-radius:10px">
+            <div>
+              <div style="font-size:16px; font-weight:700; font-family:var(--font-display)">${escHtml(data.title)}</div>
+              <div style="font-size:13px; color:var(--text2); margin-top:4px; font-family:var(--font-body)">
+                ${data.uploader ? `👤 ${escHtml(data.uploader)} · ` : ''}📹 ${data.count} videos
+              </div>
+            </div>
+          </div>`;
+
+        const list = document.getElementById('playlist-video-list');
+        list.innerHTML = '';
+        data.videos.forEach((v, i) => {
+          const item = document.createElement('div');
+          item.className = 'playlist-video-item';
+          item.setAttribute('data-idx', i);
+          item.innerHTML = `
+            <input type="checkbox" checked style="accent-color:var(--accent); flex-shrink:0" onchange="updatePlCount()" />
+            <img src="${escHtml(v.thumbnail)}" onerror="this.src=''" loading="lazy" />
+            <div class="pv-info">
+              <div class="pv-title">${escHtml(v.title)}</div>
+              <div class="pv-dur">${v.duration ? formatDuration(v.duration) : ''}</div>
+            </div>`;
+          list.appendChild(item);
+        });
+
+        updatePlCount();
+        document.getElementById('playlist-videos-card').style.display  = 'block';
+        document.getElementById('playlist-settings-card').style.display = 'block';
+        document.getElementById('pl-download-btn').style.display        = 'block';
+        showToast(`Found ${data.count} videos`, 'success');
+
+      } catch(e) {
+        showToast(e.message || 'Failed to fetch playlist', 'error');
+      } finally {
+        btn.textContent = '🔍 Fetch';
+      }
+    }
+
+    function updatePlCount() {
+      const items = document.querySelectorAll('#playlist-video-list .playlist-video-item');
+      let sel = 0;
+      items.forEach(item => { if (item.querySelector('input[type=checkbox]').checked) sel++; });
+      document.getElementById('pl-selected-count').textContent = `${sel} of ${items.length} videos selected`;
+    }
+
+    function selectAllPlaylist(val) {
+      document.querySelectorAll('#playlist-video-list input[type=checkbox]').forEach(cb => cb.checked = val);
+      updatePlCount();
+    }
+
+    function applyRange() {
+      const from = parseInt(document.getElementById('pl-range-from').value) || 1;
+      const to   = parseInt(document.getElementById('pl-range-to').value)   || 9999;
+      document.querySelectorAll('#playlist-video-list .playlist-video-item').forEach((item, i) => {
+        item.querySelector('input[type=checkbox]').checked = (i + 1) >= from && (i + 1) <= to;
+      });
+      updatePlCount();
+    }
+
+    async function startPlaylistDownload() {
+      const items = document.querySelectorAll('#playlist-video-list .playlist-video-item');
+      const urls  = [];
+      items.forEach((item, i) => {
+        if (item.querySelector('input[type=checkbox]').checked) urls.push(state.playlistVideos[i].url);
+      });
+      if (!urls.length) { showToast('Select at least one video', 'error'); return; }
+
+      const data = {
+        urls,
+        playlist_name:   state.playlistName,
+        format:          document.getElementById('pl-format').value,
+        quality:         document.getElementById('pl-quality').value,
+        subtitle_lang:   document.getElementById('pl-sublang').value,
+        skip_downloaded: document.getElementById('pl-skip-dl').checked,
+      };
+
+      try {
+        showToast(`Starting download of ${urls.length} videos...`, 'info', 3000);
+        const res = await apiFetch('/api/playlist-download', data);
+        listenProgress(res.job_id, 'playlist-progress-area');
+      } catch(e) {
+        showToast(e.message, 'error');
+      }
+    }
+
+
+    /* ─────────────────────────────────────────────
+       IMAGE DOWNLOADER
+    ───────────────────────────────────────────── */
+    async function extractImages() {
+      const urls = getUrlValues('image-urls');
+      if (!urls.length) { showToast('Enter a webpage URL', 'error'); return; }
+      showToast('Scanning page for images...', 'info', 2000);
+
+      try {
+        const data = await apiFetch('/api/extract-images', { url: urls[0] });
+        state.extractedImages = data.images;
+        state.selectedImages  = new Set(data.images.map((_, i) => i));
+
+        const grid = document.getElementById('image-thumb-grid');
+        grid.innerHTML = '';
+        data.images.forEach((img, i) => {
+          const div = document.createElement('div');
+          div.className = 'thumb-item selected';
+          div.setAttribute('data-idx', i);
+          div.onclick = () => toggleImageSelect(div, i);
+          div.innerHTML = `
+            <img src="${escHtml(img.url)}" loading="lazy" onerror="this.src=''" title="${escHtml(img.alt || '')}" />
+            <div class="thumb-check">✓</div>
+            <div class="thumb-info">${img.width && img.height ? img.width + '×' + img.height : 'Image'}</div>`;
+          grid.appendChild(div);
+        });
+
+        document.getElementById('image-grid-card').style.display = 'block';
+        updateImgCount();
+        showToast(`Found ${data.count} images`, 'success');
+
+      } catch(e) {
+        showToast(e.message || 'Failed to extract images', 'error');
+      }
+    }
+
+    function toggleImageSelect(div, idx) {
+      if (state.selectedImages.has(idx)) {
+        state.selectedImages.delete(idx);
+        div.classList.remove('selected');
+      } else {
+        state.selectedImages.add(idx);
+        div.classList.add('selected');
+      }
+      updateImgCount();
+    }
+
+    function selectAllImages(val) {
+      document.querySelectorAll('#image-thumb-grid .thumb-item').forEach((div, i) => {
+        if (val) { state.selectedImages.add(i); div.classList.add('selected'); }
+        else     { state.selectedImages.delete(i); div.classList.remove('selected'); }
+      });
+      updateImgCount();
+    }
+
+    function updateImgCount() {
+      document.getElementById('img-selected-count').textContent =
+        `${state.selectedImages.size} of ${state.extractedImages.length} selected`;
+    }
+
+    async function downloadImages() {
+      let urls = [];
+      if (state.extractedImages.length) {
+        [...state.selectedImages].forEach(i => urls.push(state.extractedImages[i].url));
+      } else {
+        urls = getUrlValues('image-urls').filter(Boolean);
+      }
+      if (!urls.length) { showToast('No images selected', 'error'); return; }
+
+      const data = {
+        urls,
+        format:        document.getElementById('img-format').value,
+        rename_prefix: document.getElementById('img-rename').value || 'image',
+        as_zip:        document.getElementById('img-zip').checked,
+      };
+
+      try {
+        showToast(`Downloading ${urls.length} images...`, 'info', 2000);
+        const res = await apiFetch('/api/download-images', data);
+        listenProgress(res.job_id, 'images-progress-area');
+      } catch(e) {
+        showToast(e.message, 'error');
+      }
+    }
+
+
+    /* ─────────────────────────────────────────────
+       BLUR ENHANCER
+    ───────────────────────────────────────────── */
+    function blurDragOver(e)  { e.preventDefault(); document.getElementById('blur-dropzone').classList.add('dragover'); }
+    function blurDragLeave(e) { document.getElementById('blur-dropzone').classList.remove('dragover'); }
+
+    function blurDropFile(e) {
+      e.preventDefault();
+      blurDragLeave(e);
+      const f = e.dataTransfer.files[0];
+      if (f) blurProcessFile(f);
+    }
+
+    function blurFileSelected(input) {
+      if (input.files[0]) blurProcessFile(input.files[0]);
+    }
+
+    function blurProcessFile(file) {
+      state.blurFile = file;
+      const info = document.getElementById('blur-file-info');
+      info.style.display = 'flex';
+      document.getElementById('blur-file-details').innerHTML = `
+        <div style="font-weight:600; font-family:var(--font-body)">${escHtml(file.name)}</div>
+        <div style="font-size:12px; color:var(--text2); margin-top:2px; font-family:var(--font-body)">
+          ${(file.size / 1024 / 1024).toFixed(2)} MB · ${file.type || 'video'}
+        </div>`;
+      document.getElementById('blur-dropzone').querySelector('p').textContent = '✅ ' + file.name;
+      showToast('Video loaded! Ready to enhance.', 'success', 2500);
+    }
+
+    async function startBlurEnhance() {
+      if (!state.blurFile) { showToast('Please upload a video file first', 'error'); return; }
+
+      // Dim cards, hide start btn, show progress
+      document.getElementById('blur-upload-card').style.opacity  = '0.4';
+      document.getElementById('blur-settings-card').style.opacity = '0.4';
+      document.getElementById('blur-start-wrap').style.display   = 'none';
+      document.getElementById('blur-result-box').classList.remove('show');
+
+      const proc = document.getElementById('blur-processing-box');
+      proc.style.display = 'block';
+      proc.classList.add('show');
+
+      setBlurRing(0);
+      setBlurLabel('Uploading video...', 'Sending to FFmpeg pipeline');
+
+      // Upload
+      const fd = new FormData();
+      fd.append('file',          state.blurFile);
+      fd.append('level',         document.getElementById('blur-level').value);
+      fd.append('resolution',    document.getElementById('blur-res').value);
+      fd.append('output_format', document.getElementById('blur-format').value);
+      fd.append('keep_original', document.getElementById('blur-keep-orig').checked ? '1' : '0');
+
+      let res;
+      try {
+        res = await fetch('/api/enhance', { method: 'POST', body: fd });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || 'Upload failed');
+        state.blurJobId = data.job_id;
+      } catch(e) {
+        showToast(e.message, 'error');
+        resetBlurUI();
+        return;
+      }
+
+      // Poll SSE progress
+      const es        = new EventSource(`/api/progress/${state.blurJobId}`);
+      const startTime = Date.now();
+
+      es.onmessage = e => {
+        const job = JSON.parse(e.data);
+        const pct = job.progress || 0;
+
+        setBlurRing(pct);
+        document.getElementById('blur-pct-text').textContent      = pct + '%';
+        document.getElementById('blur-bar-pct-text').textContent   = pct + '%';
+        document.getElementById('blur-prog-bar').style.width       = pct + '%';
+
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        document.getElementById('blur-elapsed-text').textContent = `🕐 ${elapsed}s`;
+        if (job.speed) document.getElementById('blur-speed-text').textContent = `⚡ ${job.speed}`;
+        if (job.eta)   document.getElementById('blur-eta-text').textContent   = `⏱️ ETA: ${job.eta}`;
+
+        // Stage labels by progress %
+        if      (pct < 10) setBlurLabel('Uploading & analyzing...',   'Reading codec and frame data');
+        else if (pct < 25) setBlurLabel('Applying sharpening...',     'Unsharp mask & edge enhancement');
+        else if (pct < 45) setBlurLabel('Reducing noise...',          'Temporal + spatial denoise pass');
+        else if (pct < 65) setBlurLabel('Boosting contrast...',       'Histogram & gamma correction');
+        else if (pct < 80) setBlurLabel('Upscaling resolution...',    'Bicubic upscale to target resolution');
+        else if (pct < 95) setBlurLabel('Re-encoding video...',       'H.264 high quality preset');
+        else               setBlurLabel('Finalizing...',              'Muxing audio + video streams');
+
+        if (job.status === 'done') {
+          es.close();
+          state.blurFilePath = job.filepath;
+          blurEnhanceDone(job);
+        }
+        if (job.status === 'error') {
+          es.close();
+          showToast(job.error || 'Enhancement failed', 'error');
+          resetBlurUI();
+        }
+        if (job.status === 'cancelled') {
+          es.close();
+          resetBlurUI();
+        }
+      };
+
+      es.onerror = () => {
+        es.close();
+        showToast('Connection lost during enhancement', 'error');
+        resetBlurUI();
+      };
+    }
+
+    function setBlurRing(pct) {
+      const circumference = 2 * Math.PI * 45;
+      const offset        = circumference - (circumference * pct / 100);
+      document.getElementById('blur-ring').style.strokeDashoffset = offset;
+      document.getElementById('blur-ring').style.strokeDasharray  = circumference;
+    }
+
+    function setBlurLabel(label, sub) {
+      document.getElementById('blur-stage-label').textContent = label;
+      document.getElementById('blur-stage-sub').textContent   = sub;
+    }
+
+    function blurEnhanceDone(job) {
+      document.getElementById('blur-processing-box').style.display = 'none';
+      const resultBox = document.getElementById('blur-result-box');
+      resultBox.classList.add('show');
+
+      const fname = job.filename || 'enhanced video';
+      document.getElementById('blur-result-sub').innerHTML = `
+        Your video <strong>${escHtml(fname)}</strong> has been sharpened, denoised and upscaled.<br>
+        Click <strong>Download Enhanced Video</strong> to save it to your computer.`;
+
+      showToast('Enhancement complete! 🎉', 'success', 5000);
+    }
+
+    function downloadEnhancedVideo() {
+      if (!state.blurJobId) { showToast('No enhanced video available', 'error'); return; }
+      const a = document.createElement('a');
+      a.href = `/api/download-file/${state.blurJobId}`;
+      a.setAttribute('download', '');
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      showToast('Downloading enhanced video...', 'success', 3000);
+    }
+
+    function cancelBlurEnhance() {
+      if (state.blurJobId) {
+        apiFetch(`/api/cancel/${state.blurJobId}`, null, 'POST').catch(() => {});
+      }
       resetBlurUI();
+      showToast('Enhancement cancelled', 'warning');
     }
-    if (job.status === 'cancelled') {
-      es.close();
+
+    function resetBlurUI() {
+      document.getElementById('blur-processing-box').style.display   = 'none';
+      document.getElementById('blur-upload-card').style.opacity      = '1';
+      document.getElementById('blur-settings-card').style.opacity    = '1';
+      document.getElementById('blur-start-wrap').style.display       = 'block';
+      setBlurRing(0);
+      document.getElementById('blur-pct-text').textContent      = '0%';
+      document.getElementById('blur-prog-bar').style.width       = '0%';
+      document.getElementById('blur-bar-pct-text').textContent   = '0%';
+      document.getElementById('blur-speed-text').textContent     = '⚡ —';
+      document.getElementById('blur-eta-text').textContent       = '⏱️ ETA: —';
+      document.getElementById('blur-elapsed-text').textContent   = '🕐 0s';
+    }
+
+    function resetBlurEnhancer() {
+      state.blurFile = null; state.blurJobId = null; state.blurFilePath = null;
       resetBlurUI();
+      document.getElementById('blur-result-box').classList.remove('show');
+      document.getElementById('blur-file-info').style.display = 'none';
+      document.getElementById('blur-dropzone').querySelector('p').textContent = 'Drag & Drop your blurry video here';
+      document.getElementById('blur-file-input').value = '';
+      setBlurLabel('Uploading video...', 'Please wait');
     }
-  };
 
-  es.onerror = () => { es.close(); showToast('Connection lost during enhancement', 'error'); resetBlurUI(); };
-}
 
-function setBlurRing(pct) {
-  const circumference = 2 * Math.PI * 45; // r=45
-  const offset = circumference - (circumference * pct / 100);
-  document.getElementById('blur-ring').style.strokeDashoffset = offset;
-  document.getElementById('blur-ring').style.strokeDasharray = circumference;
-}
+    /* ─────────────────────────────────────────────
+       MISC HELPERS
+    ───────────────────────────────────────────── */
+    async function cancelJob(jobId) {
+      try {
+        await apiFetch(`/api/cancel/${jobId}`, null, 'POST');
+        showToast('Download cancelled', 'warning');
+      } catch(e) {
+        showToast(e.message, 'error');
+      }
+    }
 
-function setBlurLabel(label, sub) {
-  document.getElementById('blur-stage-label').textContent = label;
-  document.getElementById('blur-stage-sub').textContent = sub;
-}
+    async function openFolder(path) {
+      try {
+        await fetch(`/api/open-folder?path=${encodeURIComponent(path)}`);
+      } catch(e) {
+        showToast('Could not open folder', 'error');
+      }
+    }
 
-function blurEnhanceDone(job) {
-  document.getElementById('blur-processing-box').style.display = 'none';
-  const resultBox = document.getElementById('blur-result-box');
-  resultBox.classList.add('show');
+    function addHistory(job) { state.history.unshift(job); renderHistory(); }
 
-  // Update result sub-text with filename
-  const fname = job.filename || 'enhanced video';
-  document.getElementById('blur-result-sub').innerHTML =
-    `Your video <strong>${escHtml(fname)}</strong> has been sharpened, denoised and upscaled.<br>
-     Click <strong>Download Enhanced Video</strong> to save it to your computer.`;
+    function renderHistory() {
+      const list = document.getElementById('history-list');
+      if (!state.history.length) {
+        list.innerHTML = '<div style="padding:50px; text-align:center; color:var(--text2); font-family:var(--font-body)">No downloads yet.</div>';
+        return;
+      }
+      const icons = { video: '🎬', audio: '🎵', convert: '🔄', playlist: '📋', images: '🖼️', enhance: '✨' };
+      list.innerHTML = state.history.map(j => `
+        <div class="history-item">
+          <span class="history-icon">${icons[j.type] || '📁'}</span>
+          <div class="history-info">
+            <div class="name">${escHtml(j.filename || 'Download')}</div>
+            <div class="path">${escHtml(j.filepath || '')}</div>
+          </div>
+          <div class="history-actions">
+            ${j.filepath ? `<button class="btn btn-secondary btn-sm" onclick="openFolder('${escHtml(j.filepath)}')">📂</button>` : ''}
+          </div>
+        </div>`
+      ).join('');
+    }
 
-  showToast('Enhancement complete! 🎉', 'success', 5000);
-}
+    function clearHistory() { state.history = []; renderHistory(); showToast('History cleared', 'info'); }
+    function openSettings()  { document.getElementById('settings-modal').classList.add('show'); }
+    function closeSettings() { document.getElementById('settings-modal').classList.remove('show'); }
 
-// ── THE KEY FUNCTION: real browser download of enhanced file ──
-function downloadEnhancedVideo() {
-  if (!state.blurJobId) { showToast('No enhanced video available', 'error'); return; }
-  const a = document.createElement('a');
-  a.href = `/api/download-file/${state.blurJobId}`;
-  a.setAttribute('download', '');
-  document.body.appendChild(a); a.click(); a.remove();
-  showToast('Downloading enhanced video...', 'success', 3000);
-}
+    document.getElementById('settings-modal').addEventListener('click', e => {
+      if (e.target === document.getElementById('settings-modal')) closeSettings();
+    });
 
-function cancelBlurEnhance() {
-  if (state.blurJobId) {
-    apiFetch(`/api/cancel/${state.blurJobId}`, null, 'POST').catch(() => {});
-  }
-  resetBlurUI();
-  showToast('Enhancement cancelled', 'warning');
-}
+    async function updateYtdlp() {
+      const btn = document.getElementById('update-btn');
+      btn.textContent = '⏳ Updating...';
+      btn.disabled    = true;
+      try {
+        const res = await apiFetch('/api/update-ytdlp', null, 'POST');
+        showToast(res.message, 'success', 5000);
+      } catch(e) {
+        showToast(e.message, 'error');
+      } finally {
+        btn.textContent = '⬆️ Update yt-dlp';
+        btn.disabled    = false;
+      }
+    }
 
-function resetBlurUI() {
-  document.getElementById('blur-processing-box').style.display = 'none';
-  document.getElementById('blur-upload-card').style.opacity = '1';
-  document.getElementById('blur-settings-card').style.opacity = '1';
-  document.getElementById('blur-start-wrap').style.display = 'block';
-  setBlurRing(0);
-  document.getElementById('blur-pct-text').textContent = '0%';
-  document.getElementById('blur-prog-bar').style.width = '0%';
-  document.getElementById('blur-bar-pct-text').textContent = '0%';
-  document.getElementById('blur-speed-text').textContent = '⚡ —';
-  document.getElementById('blur-eta-text').textContent = '⏱️ ETA: —';
-  document.getElementById('blur-elapsed-text').textContent = '🕐 0s';
-}
+    async function fetchAppInfo() {
+      try {
+        const data = await apiFetch('/api/info', null, 'GET');
+        document.getElementById('app-info').innerHTML =
+          `MediaMate v${data.version} · yt-dlp ${data.ytdlp_version} · ${data.platform}<br>📂 ${data.base_dir}`;
+      } catch {}
+    }
 
-function resetBlurEnhancer() {
-  state.blurFile = null; state.blurJobId = null; state.blurFilePath = null;
-  resetBlurUI();
-  document.getElementById('blur-result-box').classList.remove('show');
-  document.getElementById('blur-file-info').style.display = 'none';
-  document.getElementById('blur-dropzone').querySelector('p').textContent = 'Drag & Drop your blurry video here';
-  document.getElementById('blur-file-input').value = '';
-  setBlurLabel('Uploading video...', 'Please wait');
-}
+    function formatDuration(s) {
+      if (!s) return '';
+      const m = Math.floor(s / 60), sec = s % 60;
+      return m >= 60
+        ? `${Math.floor(m / 60)}h ${m % 60}m`
+        : `${m}:${String(sec).padStart(2, '0')}`;
+    }
 
-// ─── MISC ───
-async function cancelJob(jobId) {
-  try { await apiFetch(`/api/cancel/${jobId}`, null, 'POST'); showToast('Download cancelled', 'warning'); }
-  catch(e) { showToast(e.message, 'error'); }
-}
-async function openFolder(path) {
-  try { await fetch(`/api/open-folder?path=${encodeURIComponent(path)}`); }
-  catch(e) { showToast('Could not open folder', 'error'); }
-}
-function addHistory(job) { state.history.unshift(job); renderHistory(); }
-function renderHistory() {
-  const list = document.getElementById('history-list');
-  if (!state.history.length) { list.innerHTML = '<div style="padding:50px;text-align:center;color:var(--text2);font-family:var(--font-body)">No downloads yet.</div>'; return; }
-  list.innerHTML = state.history.map(j =>
-    `<div class="history-item"><span class="history-icon">${{video:'🎬',audio:'🎵',convert:'🔄',playlist:'📋',images:'🖼️',enhance:'✨'}[j.type]||'📁'}</span>
-     <div class="history-info"><div class="name">${escHtml(j.filename||'Download')}</div><div class="path">${escHtml(j.filepath||'')}</div></div>
-     <div class="history-actions">${j.filepath?`<button class="btn btn-secondary btn-sm" onclick="openFolder('${escHtml(j.filepath)}')">📂</button>`:''}</div></div>`
-  ).join('');
-}
-function clearHistory() { state.history = []; renderHistory(); showToast('History cleared', 'info'); }
-function openSettings() { document.getElementById('settings-modal').classList.add('show'); }
-function closeSettings() { document.getElementById('settings-modal').classList.remove('show'); }
-document.getElementById('settings-modal').addEventListener('click', e => { if (e.target === document.getElementById('settings-modal')) closeSettings(); });
-async function updateYtdlp() {
-  const btn = document.getElementById('update-btn'); btn.textContent = '⏳ Updating...'; btn.disabled = true;
-  try { const res = await apiFetch('/api/update-ytdlp', null, 'POST'); showToast(res.message, 'success', 5000); }
-  catch(e) { showToast(e.message, 'error'); }
-  finally { btn.textContent = '⬆️ Update yt-dlp'; btn.disabled = false; }
-}
-async function fetchAppInfo() {
-  try { const data = await apiFetch('/api/info', null, 'GET'); document.getElementById('app-info').innerHTML = `MediaMate v${data.version} · yt-dlp ${data.ytdlp_version} · ${data.platform}<br>📂 ${data.base_dir}`; }
-  catch {}
-}
-function formatDuration(s) { if (!s) return ''; const m = Math.floor(s/60), sec = s%60; return m>=60?`${Math.floor(m/60)}h ${m%60}m`:`${m}:${String(sec).padStart(2,'0')}`; }
-async function apiFetch(path, body=null, method=null) {
-  const opts = { method:method||(body?'POST':'GET'), headers:body&&!(body instanceof FormData)?{'Content-Type':'application/json'}:{}, body:body&&!(body instanceof FormData)?JSON.stringify(body):body };
-  const res = await fetch(path, opts);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.detail || data.message || 'Request failed');
-  return data;
-}
-function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-</script>
+    async function apiFetch(path, body = null, method = null) {
+      const opts = {
+        method:  method || (body ? 'POST' : 'GET'),
+        headers: body && !(body instanceof FormData) ? { 'Content-Type': 'application/json' } : {},
+        body:    body && !(body instanceof FormData) ? JSON.stringify(body) : body,
+      };
+      const res  = await fetch(path, opts);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || data.message || 'Request failed');
+      return data;
+    }
+
+    function escHtml(s) {
+      return String(s || '')
+        .replace(/&/g,  '&amp;')
+        .replace(/</g,  '&lt;')
+        .replace(/>/g,  '&gt;')
+        .replace(/"/g,  '&quot;');
+    }
+
+  </script>
+
 </body>
 </html>

@@ -885,10 +885,9 @@ def delete_job(job_id: str):
 # ─────────────────────────────────────────────
 #  STATIC FRONTEND (optional — only if bundled)
 # ─────────────────────────────────────────────
-frontend_path = Path(__file__).parent / "frontend"
-if frontend_path.exists():
-    app.mount("/", StaticFiles(directory=str(frontend_path), html=True),
-              name="static")
+@app.get("/")
+async def serve_frontend():
+    return FileResponse(Path(__file__).parent / "frontend" / "index.html")
 
 
 # ─────────────────────────────────────────────

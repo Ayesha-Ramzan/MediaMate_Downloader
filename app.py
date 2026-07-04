@@ -6,12 +6,13 @@ import json
 import platform
 import shutil
 import re
+import logging
 import mimetypes
 import urllib.request
 import zipfile
 from pathlib import Path
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
 import yt_dlp
 from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form, Request
@@ -21,9 +22,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 # ─────────────────────────────────────────────
+#  LOGGING
+#  Silent `except: pass` blocks hide real failures. This gives you
+#  actual visibility into per-item failures (e.g. image_worker skips)
+#  without crashing the batch job that contains them.
+# ─────────────────────────────────────────────
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+logger = logging.getLogger("mediamate")
+
+# ─────────────────────────────────────────────
 #  APP SETUP
 # ─────────────────────────────────────────────
-app = FastAPI(title="Video Downloader API", version="2.0.0")
+app = FastAPI(title="Video Downloader API", version="2.1.1")
 
 # ── CORS ──────────────────────────────────────
 # Add your Vercel URL(s) here. Wildcards are not
@@ -50,19 +63,115 @@ app.add_middleware(
 #  We use /tmp for safety — it's always writable.
 # ─────────────────────────────────────────────
 BASE_DIR      = Path("/tmp/Downloader")
-VIDEOS_DIR    = BASE_DIR / "Videos"
-MUSIC_DIR     = BASE_DIR / "Music"
-IMAGES_DIR    = BASE_DIR / "Images"
-CONVERTED_DIR = BASE_DIR / "Converted"
-UPLOADS_DIR   = BASE_DIR / "Uploads"
+DOWNLOADS_DIR = BASE_DIR / "Downloads"   # everything (video/audio/images/converted) lands here
+UPLOADS_DIR   = BASE_DIR / "Uploads"     # temp storage for files the user uploads (not shown to user)
 
-for d in [VIDEOS_DIR, MUSIC_DIR, IMAGES_DIR, CONVERTED_DIR, UPLOADS_DIR]:
+# Kept as aliases so nothing downstream needs to guess which constant to use —
+# they all point at the same single folder now, no more splitting by type.
+VIDEOS_DIR    = DOWNLOADS_DIR
+MUSIC_DIR     = DOWNLOADS_DIR
+IMAGES_DIR    = DOWNLOADS_DIR
+CONVERTED_DIR = DOWNLOADS_DIR
+
+for d in [DOWNLOADS_DIR, UPLOADS_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 # ─────────────────────────────────────────────
 #  IN-MEMORY JOB STORE
+#  No persistence layer here — jobs live only as long as the process does,
+#  by design (this is a single-instance local/HF-Spaces app, not a
+#  multi-worker deployment). But unbounded growth within that lifetime is
+#  still a real leak, so we sweep terminal (done/error/cancelled) jobs
+#  that are older than JOB_TTL_SECONDS, and hard-cap total job count.
 # ─────────────────────────────────────────────
 jobs: dict = {}
+
+JOB_TTL_SECONDS = 2 * 60 * 60   # drop finished jobs after 2 hours
+MAX_JOBS        = 200           # hard ceiling regardless of age
+
+TERMINAL_STATUSES = {"done", "error", "cancelled"}
+
+
+def cleanup_old_jobs() -> None:
+    """Evict stale terminal jobs. Called opportunistically on job creation
+    rather than on a background timer — simplest option for an in-memory
+    dict with no persistence, and cheap enough (O(n) over a capped n)."""
+    now = datetime.now(timezone.utc)
+    stale_ids = []
+
+    for jid, job in jobs.items():
+        if job.get("status") not in TERMINAL_STATUSES:
+            continue
+        created_raw = job.get("created_at")
+        if not created_raw:
+            continue
+        try:
+            created = datetime.fromisoformat(created_raw)
+        except ValueError:
+            continue
+        if (now - created).total_seconds() > JOB_TTL_SECONDS:
+            stale_ids.append(jid)
+
+    for jid in stale_ids:
+        jobs.pop(jid, None)
+
+    if len(jobs) > MAX_JOBS:
+        overflow = len(jobs) - MAX_JOBS
+        oldest_terminal = sorted(
+            (j for j in jobs.values() if j.get("status") in TERMINAL_STATUSES),
+            key=lambda j: j.get("created_at", ""),
+        )
+        for j in oldest_terminal[:overflow]:
+            jobs.pop(j["id"], None)
+
+
+# ─────────────────────────────────────────────
+#  SUPPORTED SOURCES (informational only — yt-dlp
+#  auto-detects the right extractor from the URL,
+#  so no special-casing is needed anywhere else in
+#  the app. This list is just used for the friendly
+#  "/api/info" response and docs.)
+#  Includes: YouTube, TikTok, Instagram, Twitter/X,
+#  Facebook, Vimeo, LinkedIn (public post videos only).
+# ─────────────────────────────────────────────
+SUPPORTED_SOURCES = [
+    "youtube", "tiktok", "instagram", "twitter", "facebook", "vimeo", "linkedin",
+]
+
+# Substrings yt-dlp tends to surface in DownloadError messages when a video
+# sits behind a login wall or a private/restricted feed. LinkedIn's extractor
+# only supports public post videos, so private/login-gated LinkedIn videos
+# will typically trip one of these.
+LOGIN_REQUIRED_HINTS = [
+    "login required",
+    "requires login",
+    "log in",
+    "sign in",
+    "private video",
+    "private profile",
+    "authentication",
+    "cookies",
+    "this post is not available",
+    "not available on this app",
+]
+
+
+def is_login_required_error(error_message: str) -> bool:
+    msg = (error_message or "").lower()
+    return any(hint in msg for hint in LOGIN_REQUIRED_HINTS)
+
+
+def friendly_extractor_error(url: str, error_message: str) -> str:
+    """
+    Turn a raw yt-dlp error into a clearer message for the user, with a
+    LinkedIn-specific hint since its extractor only covers public posts.
+    """
+    if is_login_required_error(error_message):
+        if "linkedin" in url.lower():
+            return ("This LinkedIn video is private or requires login and "
+                    "can't be downloaded.")
+        return "This video is private or requires login and can't be downloaded."
+    return f"Could not process this URL: {error_message[:300]}"
 
 
 # ─────────────────────────────────────────────
@@ -112,6 +221,7 @@ class VideoInfoRequest(BaseModel):
 #  JOB HELPERS
 # ─────────────────────────────────────────────
 def create_job(type_: str = "video") -> str:
+    cleanup_old_jobs()
     job_id = str(uuid.uuid4())[:8]
     jobs[job_id] = {
         "id": job_id,
@@ -125,7 +235,7 @@ def create_job(type_: str = "video") -> str:
         "filesize": "",
         "error": "",
         "message": "Starting...",
-        "created_at": datetime.utcnow().isoformat(),
+        "created_at": datetime.now(timezone.utc).isoformat(),
     }
     return job_id
 
@@ -219,6 +329,13 @@ def build_ydl_opts(job_id: str, out_dir: Path, req) -> dict:
                     "already_have_subtitle": False,
                 })
 
+    # NOTE: No special-casing is needed here for LinkedIn (or any other
+    # source) — yt-dlp auto-detects the correct extractor from the URL.
+    # LinkedIn's extractor only supports public post videos; private or
+    # login-gated feed videos will raise a DownloadError, which the
+    # download worker / video-info endpoint translate into a friendly
+    # message below.
+
     return opts
 
 
@@ -284,9 +401,14 @@ def download_worker(job_id: str, urls: List[str], out_dir: Path,
         )
 
     except yt_dlp.utils.DownloadError as e:
-        update_job(job_id, status="error",
-                   error=f"Download error: {str(e)[:300]}")
+        raw = str(e)
+        # First URL in the batch is used to give LinkedIn-specific wording
+        # when relevant; falls back to a generic message otherwise.
+        friendly = friendly_extractor_error(urls[0] if urls else "", raw)
+        logger.warning(f"Download failed for job {job_id}: {raw}")
+        update_job(job_id, status="error", error=friendly)
     except Exception as e:
+        logger.exception(f"Unexpected error in download_worker for job {job_id}")
         update_job(job_id, status="error", error=str(e)[:300])
 
 
@@ -383,6 +505,7 @@ def _enhance_worker(job_id: str, input_path: str, out_path: str,
 
         if proc.returncode != 0:
             stderr_out = proc.stderr.read() if proc.stderr else ""
+            logger.warning(f"FFmpeg enhance failed for job {job_id}: {stderr_out[-300:]}")
             update_job(job_id, status="error",
                        error=stderr_out[-300:] or "FFmpeg error")
             return
@@ -402,6 +525,7 @@ def _enhance_worker(job_id: str, input_path: str, out_path: str,
         )
 
     except Exception as e:
+        logger.exception(f"Unexpected error in _enhance_worker for job {job_id}")
         update_job(job_id, status="error", error=str(e)[:300])
 
 
@@ -420,31 +544,70 @@ def get_info():
         ytdlp_ver = "unknown"
 
     return {
-        "version":       "2.0.0",
+        "version":       "2.1.1",
         "ytdlp_version": ytdlp_ver,
         "platform":      platform.system(),
         "base_dir":      str(BASE_DIR),
+        "supported_sources": SUPPORTED_SOURCES,
         "status":        "ok",
     }
 
 
-# ── Video metadata ────────────────────────────
+# ── Video metadata (preview before download) ──
 @app.post("/api/video-info")
 def video_info(req: VideoInfoRequest):
-    if not req.url.strip():
+    """
+    Fetch metadata only (title, thumbnail, duration, uploader, id, extractor)
+    for a preview card — this never downloads the actual video/audio file.
+    Works for any source yt-dlp supports (YouTube, TikTok, Instagram,
+    Twitter/X, Facebook, Vimeo, LinkedIn public post videos, etc.) since
+    yt-dlp auto-detects the right extractor from the URL.
+
+    `id` + `extractor` are returned so the frontend can decide whether it
+    can build a real inline iframe player (currently: YouTube, Vimeo only —
+    those are the only two sources with a stable public embed URL pattern
+    that needs nothing but the video ID). Everything else falls back to a
+    thumbnail-only preview on the frontend.
+    """
+    url = req.url.strip()
+    if not url:
         raise HTTPException(400, "URL is required")
+
+    ydl_opts = {
+        "quiet":         True,
+        "no_warnings":   True,
+        "skip_download": True,   # belt-and-braces alongside download=False
+        "extract_flat":  False,  # we need real metadata, not a flat listing
+        "socket_timeout": 15,
+        "noplaylist":    True,
+    }
+
     try:
-        with yt_dlp.YoutubeDL({"quiet": True, "socket_timeout": 15}) as ydl:
-            info = ydl.extract_info(req.url, download=False)
-            return {
-                "title":     info.get("title", ""),
-                "duration":  info.get("duration", 0),
-                "thumbnail": info.get("thumbnail", ""),
-                "uploader":  info.get("uploader", ""),
-                "view_count": info.get("view_count", 0),
-            }
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+
+        if not info:
+            raise HTTPException(400, "Could not extract any information from this URL.")
+
+        return {
+            "id":         info.get("id", ""),
+            "title":      info.get("title", ""),
+            "thumbnail":  info.get("thumbnail", ""),
+            "duration":   info.get("duration", 0),
+            "uploader":   info.get("uploader", ""),
+            "view_count": info.get("view_count", 0),
+            "extractor":  info.get("extractor_key") or info.get("extractor", "unknown"),
+        }
+
+    except yt_dlp.utils.DownloadError as e:
+        detail = friendly_extractor_error(url, str(e))
+        logger.warning(f"video_info failed for {url}: {e}")
+        raise HTTPException(400, detail)
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(400, f"Could not fetch video info: {e}")
+        logger.exception(f"Unexpected error in video_info for {url}")
+        raise HTTPException(400, f"Could not fetch video info: {str(e)[:300]}")
 
 
 # ── Start download ────────────────────────────
@@ -569,6 +732,7 @@ async def convert_video(
                 result = subprocess.run(cmd, capture_output=True, text=True)
 
                 if result.returncode != 0:
+                    logger.warning(f"ffmpeg convert failed for job {job_id}: {result.stderr[-300:]}")
                     update_job(job_id, status="error",
                                error=result.stderr[-300:])
                     return
@@ -577,14 +741,20 @@ async def convert_video(
                            filename=out_file.name, filepath=str(out_file))
 
             elif url.strip():
-                class _Req:
-                    format        = output_format
-                    quality       = "best"
-                    tab           = "audio"
-                    audio_quality = quality
-                    subtitle_lang = "none"
-
-                ydl_opts = build_ydl_opts(job_id, CONVERTED_DIR, _Req())
+                # Real validated model instead of a hand-rolled duck-typed
+                # stand-in — build_ydl_opts() reads attributes off `req` via
+                # getattr(), so it works with any object shape, but a real
+                # DownloadRequest gets Pydantic validation for free instead
+                # of silently trusting whatever shape a throwaway class has.
+                audio_req = DownloadRequest(
+                    urls=[url],
+                    format=output_format,
+                    quality="best",
+                    tab="audio",
+                    audio_quality=quality,
+                    subtitle_lang="none",
+                )
+                ydl_opts = build_ydl_opts(job_id, CONVERTED_DIR, audio_req)
                 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     ydl.download([url])
                 update_job(job_id, status="done", progress=100,
@@ -594,7 +764,12 @@ async def convert_video(
                 update_job(job_id, status="error",
                            error="No file or URL provided")
 
+        except yt_dlp.utils.DownloadError as e:
+            friendly = friendly_extractor_error(url, str(e))
+            logger.warning(f"Convert download failed for job {job_id}: {e}")
+            update_job(job_id, status="error", error=friendly)
         except Exception as e:
+            logger.exception(f"Unexpected error in convert_worker for job {job_id}")
             update_job(job_id, status="error", error=str(e)[:300])
 
     background_tasks.add_task(convert_worker)
@@ -630,7 +805,10 @@ def playlist_info(req: PlaylistInfoRequest):
                 "count":    len(videos),
                 "videos":   videos,
             }
+    except yt_dlp.utils.DownloadError as e:
+        raise HTTPException(400, friendly_extractor_error(req.url, str(e)))
     except Exception as e:
+        logger.exception(f"Unexpected error in playlist_info for {req.url}")
         raise HTTPException(400, str(e))
 
 
@@ -640,15 +818,18 @@ def playlist_download(req: PlaylistDownloadRequest,
                        background_tasks: BackgroundTasks):
     job_id = create_job("playlist")
 
-    class _Req:
-        format        = req.format
-        quality       = req.quality
-        tab           = "video"
-        subtitle_lang = req.subtitle_lang
-        embed_subs    = False
-        audio_quality = "192"
-
-    ydl_opts = build_ydl_opts(job_id, VIDEOS_DIR, _Req())
+    # Real validated model instead of the previous hand-rolled `_Req` class —
+    # same reasoning as convert_worker above.
+    video_req = DownloadRequest(
+        urls=req.urls,
+        format=req.format,
+        quality=req.quality,
+        tab="video",
+        subtitle_lang=req.subtitle_lang,
+        embed_subs=False,
+        audio_quality="192",
+    )
+    ydl_opts = build_ydl_opts(job_id, VIDEOS_DIR, video_req)
     ydl_opts["noplaylist"] = False
 
     background_tasks.add_task(
@@ -695,6 +876,7 @@ def extract_images(req: ExtractImagesRequest):
         return {"images": imgs, "count": len(imgs)}
 
     except Exception as e:
+        logger.exception(f"Unexpected error in extract_images for {req.url}")
         raise HTTPException(400, str(e))
 
 
@@ -727,8 +909,12 @@ def download_images_api(req: ImageDownloadRequest,
                     with urllib.request.urlopen(r, timeout=15) as resp:
                         dest.write_bytes(resp.read())
                     downloaded.append(str(dest))
-                except Exception:
-                    pass  # skip broken URLs
+                except Exception as e:
+                    # Previously a bare `except: pass` — silently swallowed
+                    # every per-image failure with zero way to debug a batch
+                    # that came back short. Now at least logged, and the
+                    # skip is still non-fatal to the rest of the batch.
+                    logger.warning(f"Skipped image {url} in job {job_id}: {e}")
 
                 pct = round((i + 1) / total * 90, 1)
                 update_job(job_id, status="downloading", progress=pct,
@@ -756,6 +942,7 @@ def download_images_api(req: ImageDownloadRequest,
                            filepath=str(IMAGES_DIR))
 
         except Exception as e:
+            logger.exception(f"Unexpected error in image_worker for job {job_id}")
             update_job(job_id, status="error", error=str(e)[:300])
 
     background_tasks.add_task(image_worker)
@@ -769,7 +956,7 @@ async def progress_stream(job_id: str):
         raise HTTPException(404, "Job not found")
 
     async def event_gen():
-        terminal = {"done", "error", "cancelled"}
+        terminal = TERMINAL_STATUSES
         while True:
             job = jobs.get(job_id, {})
             yield f"data: {json.dumps(job)}\n\n"
@@ -810,8 +997,8 @@ def open_folder(path: str = ""):
             subprocess.Popen(["open", target])
         else:
             subprocess.Popen(["xdg-open", target])
-    except Exception:
-        pass  # silently fail on HF headless server
+    except Exception as e:
+        logger.warning(f"Could not open folder {target}: {e}")
     return {"ok": True}
 
 

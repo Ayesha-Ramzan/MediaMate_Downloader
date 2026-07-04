@@ -362,6 +362,15 @@
     .btn-download:hover  { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(42,122,90,0.5); }
     .btn-download:active { transform: translateY(0); }
 
+    /* Disabled state for any .btn (used by the gated Video download button) */
+    .btn:disabled {
+      opacity:        .5;
+      cursor:         not-allowed;
+      pointer-events: none;
+      transform:      none !important;
+      box-shadow:     none !important;
+    }
+
     /* ─────────────────────────────────────────────
        CARDS
     ───────────────────────────────────────────── */
@@ -422,6 +431,75 @@
       from { opacity: 0; transform: translateY(-6px); }
       to   { opacity: 1; transform: none; }
     }
+
+    /* ─────────────────────────────────────────────
+       VIDEO URL FETCH / PREVIEW  (new)
+    ───────────────────────────────────────────── */
+    .url-fetch-row { display: flex; gap: 8px; }
+    .url-fetch-row .input { flex: 1; }
+
+    /* THE BUG: this wrapper needs min-width:0 or a flex item with long text
+       content (long URL / long title) refuses to shrink below its content
+       width and blows the whole row past the card boundary. flex:1 alone
+       is not enough — min-width defaults to `auto`, not `0`. */
+    .vp-wrap { flex: 1; min-width: 0; }
+
+    .video-preview-card {
+      display:       flex;
+      gap:           10px;
+      align-items:   center;
+      background:    var(--surface2);
+      border:        1px solid var(--border);
+      border-radius: 9px;
+      padding:       8px 10px;
+      margin-top:    8px;
+      font-family:   var(--font-body);
+      animation:     slideIn .2s ease;
+      min-width:     0;
+    }
+    .video-preview-card .vp-media {
+      width:         64px;
+      height:        36px;
+      border-radius: 6px;
+      background:    var(--border);
+      flex-shrink:   0;
+      overflow:      hidden;
+    }
+    .video-preview-card .vp-media img {
+      width:      100%;
+      height:     100%;
+      object-fit: cover;
+      display:    block;
+    }
+    .video-preview-card .vp-info  { flex: 1; min-width: 0; }
+    .video-preview-card .vp-title { font-size: 13px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .video-preview-card .vp-meta  { font-size: 11px; color: var(--text2); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .video-preview-card.vp-error         { border-color: var(--accent3); }
+    .video-preview-card.vp-error .vp-title { color: var(--accent3); }
+
+    /* Embed variant — YouTube / Vimeo get a real inline player instead of
+       a static thumbnail. Card switches to a column layout with a full
+       width 16:9 player on top. */
+    .video-preview-card.vp-has-embed {
+      flex-direction: column;
+      align-items:    stretch;
+      padding:        10px;
+    }
+    .video-preview-card.vp-has-embed .vp-media {
+      width:         100%;
+      height:        auto;
+      aspect-ratio:  16 / 9;
+      border-radius: 8px;
+    }
+    .video-preview-card.vp-has-embed .vp-media iframe {
+      width:  100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+    .video-preview-card.vp-has-embed .vp-info  { margin-top: 8px; }
+    .video-preview-card.vp-has-embed .vp-title { white-space: normal; }
+    .video-preview-card.vp-has-embed .vp-meta  { white-space: normal; }
 
     /* ─────────────────────────────────────────────
        PROGRESS
@@ -768,43 +846,6 @@
       .thumb-grid                   { grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); }
     }
 
-    /* ─────────────────────────────────────────────
-       ENHANCE DROP ZONE
-    ───────────────────────────────────────────── */
-    .enhance-dropzone {
-      border:        2px dashed var(--border);
-      border-radius: 16px;
-      padding:       60px 40px;
-      text-align:    center;
-      cursor:        pointer;
-      transition:    .3s;
-      background:    linear-gradient(135deg, rgba(74,140,122,0.04), rgba(58,110,94,0.04));
-      position:      relative;
-      overflow:      hidden;
-    }
-    .enhance-dropzone::before {
-      content:        '';
-      position:       absolute;
-      inset:          0;
-      background:     radial-gradient(ellipse 300px 200px at 50% 0%, rgba(74,140,122,0.06), transparent);
-      pointer-events: none;
-    }
-    .enhance-dropzone:hover,
-    .enhance-dropzone.dragover { border-color: var(--accent); background: linear-gradient(135deg, rgba(74,140,122,0.08), rgba(58,110,94,0.06)); }
-    .enhance-drop-icon         { font-size: 52px; margin-bottom: 16px; display: block; }
-
-    /* Quality badges */
-    .quality-badge { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 99px; font-size: 12px; font-weight: 600; margin: 4px; font-family: var(--font-body); }
-    .badge-before  { background: rgba(192,83,58,.12);  color: var(--accent3); }
-    .badge-after   { background: rgba(58,122,101,.12); color: var(--accent2); }
-
-    /* Progress ring */
-    .ring-wrap  { position: relative; width: 100px; height: 100px; margin: 0 auto 20px; }
-    .ring-bg    { fill: none; stroke: var(--surface2); stroke-width: 8; }
-    .ring-fill  { fill: none; stroke-width: 8; stroke-linecap: round; transform-origin: 50% 50%; transform: rotate(-90deg); stroke: url(#ringGrad); stroke-dasharray: 283; stroke-dashoffset: 283; transition: stroke-dashoffset .6s ease; }
-    .ring-text  { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; font-family: var(--font-display); color: var(--accent); }
-    .ring-sub   { font-size: 10px; color: var(--text2); font-weight: 400; font-family: var(--font-body); letter-spacing: 0.5px; }
-
     /* Hero accent box */
     .hero-accent {
       background: linear-gradient(135deg, rgba(74,140,122,0.07), rgba(58,110,94,0.05));
@@ -835,13 +876,13 @@
     ───────────────────────────────────────────── */
     .home-hero {
       text-align:    center;
-      padding:       72px 20px 56px;
+      padding:        30px 18px 20px;
       border-bottom: 1px solid var(--border);
-      margin-bottom: 48px;
+      margin-bottom: 30px;
       position:      relative;
     }
 
-    .home-wave { font-size: 52px; margin-bottom: 20px; display: block; animation: wave 2.5s ease-in-out infinite; }
+    .home-wave { font-size: 52px; margin-bottom: 12px; display: block; animation: wave 2.5s ease-in-out infinite; }
     @keyframes wave { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(15deg); } }
 
     .home-headline {
@@ -883,9 +924,26 @@
     .home-cta-question { font-family: var(--font-display); font-size: 26px; font-weight: 600; color: var(--text); letter-spacing: 0.2px; font-style: italic; }
     .home-cta-btn      { padding: 14px 48px; font-size: 15px; border-radius: 50px; letter-spacing: 0.4px; font-weight: 600; }
 
-    .home-features-title { font-family: var(--font-display); font-size: 26px; font-weight: 600; color: var(--text); margin-bottom: 24px; padding-left: 2px; letter-spacing: 0.2px; }
+    .home-features-title {
+      font-family:   var(--font-display);
+      font-size:     26px;
+      font-weight:   600;
+      color:         var(--text);
+      margin-bottom: 24px;
+      text-align:    center;
+      letter-spacing: 0.2px;
+    }
 
-    .home-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px,1fr)); gap: 16px; margin-bottom: 28px; }
+    /* ── Home cards grid ──
+       Fixed 2-column grid so 4 cards always form a tidy 2x2 block,
+       centered on the page with no stray empty space. */
+    .home-cards {
+      display:               grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap:                   18px;
+      max-width:             720px;
+      margin:                0 auto 28px;
+    }
 
     .home-card {
       background:    var(--surface);
@@ -907,39 +965,10 @@
     .home-card-tag   { display: inline-flex; align-items: center; font-size: 10px; font-weight: 600; color: var(--accent); background: var(--accent-glow); padding: 3px 10px; border-radius: 99px; letter-spacing: 0.8px; font-family: var(--font-body); text-transform: uppercase; }
     .new-tag         { color: var(--surface); background: var(--accent); }
 
-    @media (max-width: 700px) { .home-headline { font-size: 36px; } }
-
-    /* ─────────────────────────────────────────────
-       ENHANCE RESULT & PROCESSING BOXES
-    ───────────────────────────────────────────── */
-    .enhance-result-box {
-      display:       none;
-      background:    linear-gradient(135deg, rgba(42,122,90,0.08), rgba(58,140,100,0.05));
-      border:        1.5px solid rgba(58,122,101,0.3);
-      border-radius: 16px;
-      padding:       32px 28px;
-      text-align:    center;
-      margin-top:    20px;
-      animation:     fadeUp .4s ease;
+    @media (max-width: 700px) {
+      .home-headline { font-size: 36px; }
+      .home-cards    { grid-template-columns: 1fr; }
     }
-    .enhance-result-box.show { display: block; }
-
-    .enhance-result-box .result-icon  { font-size: 52px; margin-bottom: 12px; display: block; animation: pop .4s cubic-bezier(.34,1.56,.64,1); }
-    @keyframes pop { from { transform: scale(0.5); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-
-    .enhance-result-box .result-title   { font-family: var(--font-display); font-size: 28px; font-weight: 700; color: var(--accent2); margin-bottom: 6px; letter-spacing: 0.2px; }
-    .enhance-result-box .result-sub     { font-size: 13.5px; color: var(--text2); margin-bottom: 24px; line-height: 1.7; font-family: var(--font-body); }
-    .enhance-result-box .result-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
-
-    .enhance-processing-box {
-      display:       none;
-      background:    var(--surface);
-      border:        1px solid var(--border);
-      border-radius: 16px;
-      padding:       32px 28px;
-      margin-top:    20px;
-    }
-    .enhance-processing-box.show { display: block; }
 
   </style>
 </head>
@@ -973,18 +1002,9 @@
       <div class="nav-section-label" style="margin-top:6px">Downloaders</div>
 
       <button class="nav-item" id="nav-video"    onclick="switchTab('video', this)">    <span class="nav-icon">🎬</span><span class="nav-label">Video Downloader</span></button>
-      <button class="nav-item" id="nav-audio"    onclick="switchTab('audio', this)">    <span class="nav-icon">🎵</span><span class="nav-label">Audio Downloader</span></button>
       <button class="nav-item" id="nav-convert"  onclick="switchTab('convert', this)">  <span class="nav-icon">🔄</span><span class="nav-label">Video to Audio</span></button>
       <button class="nav-item" id="nav-playlist" onclick="switchTab('playlist', this)"> <span class="nav-icon">📋</span><span class="nav-label">Playlist Downloader</span></button>
       <button class="nav-item" id="nav-images"   onclick="switchTab('images', this)">   <span class="nav-icon">🖼️</span><span class="nav-label">Image Downloader</span></button>
-
-      <div class="nav-section-label" style="margin-top:10px">Enhancement</div>
-
-      <button class="nav-item" id="nav-blur" onclick="switchTab('blur', this)">
-        <span class="nav-icon">✨</span>
-        <span class="nav-label">Blur → High Quality</span>
-        <span class="nav-badge">NEW</span>
-      </button>
 
       <div class="nav-section-label" style="margin-top:10px">More</div>
 
@@ -1044,15 +1064,8 @@
           <div class="home-card" onclick="switchTab('video', document.getElementById('nav-video'))">
             <div class="home-card-icon">🎬</div>
             <div class="home-card-title">Download Any Video</div>
-            <div class="home-card-desc">Drop a YouTube, TikTok, Instagram, Twitter, Facebook or Vimeo link — get it in HD, Full HD, or 4K.</div>
+            <div class="home-card-desc">Drop a YouTube, TikTok, Instagram, Twitter, Facebook, LinkedIn or Vimeo link — get it in HD, Full HD, or 4K.</div>
             <div class="home-card-tag">Video Downloader</div>
-          </div>
-
-          <div class="home-card" onclick="switchTab('audio', document.getElementById('nav-audio'))">
-            <div class="home-card-icon">🎵</div>
-            <div class="home-card-title">Extract Audio Tracks</div>
-            <div class="home-card-desc">Give me the link and I'll extract crisp MP3, FLAC or WAV — complete with album art and auto-tagged metadata.</div>
-            <div class="home-card-tag">Audio Downloader</div>
           </div>
 
           <div class="home-card" onclick="switchTab('convert', document.getElementById('nav-convert'))">
@@ -1076,13 +1089,6 @@
             <div class="home-card-tag">Image Downloader</div>
           </div>
 
-          <div class="home-card" onclick="switchTab('blur', document.getElementById('nav-blur'))">
-            <div class="home-card-icon">✨</div>
-            <div class="home-card-title">Restore Blurry Videos</div>
-            <div class="home-card-desc">Upload a blurry clip — I'll sharpen it, reduce noise, boost contrast and upscale it. Real FFmpeg processing, not fake.</div>
-            <div class="home-card-tag new-tag">NEW · Blur Enhancer</div>
-          </div>
-
         </div>
       </div>
 
@@ -1093,7 +1099,7 @@
 
         <div class="hero-accent">
           <div class="section-header">🎬 Video Downloader</div>
-          <div class="section-sub">Download from YouTube, Instagram, TikTok, Twitter/X, Facebook, Vimeo &amp; 1000+ sites</div>
+          <div class="section-sub">Download from YouTube, Instagram, TikTok, Twitter/X, Facebook, LinkedIn, Vimeo &amp; 1000+ sites</div>
         </div>
 
         <!-- URLs -->
@@ -1180,64 +1186,9 @@
         <button id="video-download-btn"
                 class="btn btn-primary"
                 style="width:100%; justify-content:center; padding:14px; font-size:15px"
-                onclick="startVideoDownload()">
+                onclick="startVideoDownload()"
+                disabled>
           ⬇️ Download Videos
-        </button>
-
-      </div>
-
-      <!-- ──────────────────────────────────────
-           TAB: AUDIO DOWNLOADER
-      ────────────────────────────────────────── -->
-      <div id="tab-audio" class="tab-panel">
-
-        <div class="hero-accent">
-          <div class="section-header">🎵 Audio Downloader</div>
-          <div class="section-sub">Extract audio from any video URL — music, podcasts, speeches and more</div>
-        </div>
-
-        <!-- URLs -->
-        <div class="card">
-          <div class="card-title"><span>🔗</span> Audio / Video URLs</div>
-          <div id="audio-urls"></div>
-          <button class="btn btn-secondary btn-sm" onclick="addUrlField('audio-urls','audio')">＋ Add Another Link</button>
-        </div>
-
-        <!-- Settings -->
-        <div class="card">
-          <div class="card-title"><span>⚙️</span> Audio Settings</div>
-          <div class="input-row">
-            <div class="field" style="flex:1">
-              <label>Format</label>
-              <select class="input" id="a-format">
-                <option value="mp3">MP3</option>
-                <option value="aac">AAC</option>
-                <option value="flac">FLAC</option>
-                <option value="wav">WAV</option>
-                <option value="ogg">OGG</option>
-                <option value="m4a">M4A</option>
-                <option value="opus">OPUS</option>
-              </select>
-            </div>
-            <div class="field" style="flex:1">
-              <label>Quality / Bitrate</label>
-              <select class="input" id="a-quality">
-                <option value="320">320 kbps (Best)</option>
-                <option value="256">256 kbps</option>
-                <option value="192">192 kbps</option>
-                <option value="128">128 kbps</option>
-                <option value="64">64 kbps</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div id="audio-progress-area"></div>
-
-        <button class="btn btn-primary"
-                style="width:100%; justify-content:center; padding:14px; font-size:15px"
-                onclick="startAudioDownload()">
-          🎵 Download Audio
         </button>
 
       </div>
@@ -1482,158 +1433,6 @@
       </div>
 
       <!-- ──────────────────────────────────────
-           TAB: BLUR ENHANCER
-      ────────────────────────────────────────── -->
-      <div id="tab-blur" class="tab-panel">
-
-        <div class="hero-accent" style="background:linear-gradient(135deg,rgba(74,140,122,0.08),rgba(58,110,94,0.06)); border-color:rgba(74,140,122,0.2)">
-          <div class="section-header">✨ Blur → High Quality</div>
-          <div class="section-sub">Upload your blurry or low-quality video. We'll sharpen, denoise, boost contrast and upscale it using real FFmpeg processing — not AI cartoonish effects.</div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap">
-            <span class="quality-badge badge-before">Before: Blurry / Low-res</span>
-            <span style="display:flex; align-items:center; font-size:14px">→</span>
-            <span class="quality-badge badge-after">After: Sharp &amp; Natural HD</span>
-          </div>
-        </div>
-
-        <!-- Upload -->
-        <div class="card" id="blur-upload-card">
-          <div class="card-title"><span>📁</span> Upload Your Video</div>
-
-          <div id="blur-dropzone"
-               class="enhance-dropzone"
-               onclick="document.getElementById('blur-file-input').click()"
-               ondragover="blurDragOver(event)"
-               ondragleave="blurDragLeave(event)"
-               ondrop="blurDropFile(event)">
-            <span class="enhance-drop-icon">🎞️</span>
-            <p style="font-size:15px; font-weight:600; color:var(--text); margin-bottom:6px; font-family:var(--font-body)">Drag &amp; Drop your blurry video here</p>
-            <div style="font-size:13px; color:var(--text2); font-family:var(--font-body)">Supports: MP4, MKV, AVI, MOV, WEBM, FLV, WMV</div>
-            <div class="drop-note" style="margin-top:10px">or click to browse files</div>
-          </div>
-
-          <input type="file" id="blur-file-input"
-                 accept=".mp4,.mkv,.avi,.mov,.webm,.flv,.wmv"
-                 style="display:none"
-                 onchange="blurFileSelected(this)" />
-
-          <div id="blur-file-info"
-               style="display:none; margin-top:12px; padding:12px 16px; background:var(--surface2); border-radius:10px; font-size:13px; border:1px solid var(--border); display:flex; align-items:center; gap:10px; font-family:var(--font-body)">
-            <span style="font-size:22px">🎞️</span>
-            <div id="blur-file-details"></div>
-          </div>
-        </div>
-
-        <!-- Enhancement Settings -->
-        <div class="card" id="blur-settings-card">
-          <div class="card-title"><span>⚙️</span> Enhancement Settings</div>
-          <div class="input-row">
-            <div class="field" style="flex:1">
-              <label>Enhancement Level</label>
-              <select class="input" id="blur-level">
-                <option value="light">Light — Subtle sharpening only</option>
-                <option value="medium" selected>Medium — Balanced (recommended)</option>
-                <option value="strong">Strong — Max sharpening + full denoise</option>
-              </select>
-            </div>
-            <div class="field" style="flex:1">
-              <label>Target Resolution</label>
-              <select class="input" id="blur-res">
-                <option value="auto">Auto (Best fit)</option>
-                <option value="720p">720p HD</option>
-                <option value="1080p">1080p Full HD</option>
-                <option value="original">Keep Original Size</option>
-              </select>
-            </div>
-          </div>
-          <div class="field">
-            <label>Output Format</label>
-            <select class="input" id="blur-format" style="max-width:220px">
-              <option value="mp4">MP4 (Recommended)</option>
-              <option value="mkv">MKV</option>
-              <option value="mov">MOV</option>
-            </select>
-          </div>
-          <label class="check-wrap" style="margin-top:6px">
-            <input type="checkbox" id="blur-keep-orig" checked>
-            Keep original file alongside enhanced version
-          </label>
-        </div>
-
-        <!-- Processing Progress Box -->
-        <div class="enhance-processing-box" id="blur-processing-box">
-
-          <div style="text-align:center; margin-bottom:24px">
-            <svg width="110" height="110" viewBox="0 0 110 110" style="display:block; margin:0 auto">
-              <defs>
-                <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%"   stop-color="#4a8c7a" />
-                  <stop offset="100%" stop-color="#3a6e5e" />
-                </linearGradient>
-              </defs>
-              <circle class="ring-bg"   cx="55" cy="55" r="45" />
-              <circle class="ring-fill" id="blur-ring" cx="55" cy="55" r="45" />
-            </svg>
-            <div style="margin-top:-95px; height:95px; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none">
-              <div id="blur-pct-text" style="font-family:var(--font-display); font-size:22px; font-weight:700; color:var(--accent)">0%</div>
-              <div style="font-size:10px; color:var(--text2); font-family:var(--font-body); letter-spacing:0.5px">processing</div>
-            </div>
-          </div>
-
-          <div style="text-align:center; margin-bottom:20px">
-            <div id="blur-stage-label" style="font-family:var(--font-display); font-size:20px; font-weight:600; margin-bottom:4px">Uploading video...</div>
-            <div id="blur-stage-sub"   style="font-size:13px; color:var(--text2); font-family:var(--font-body)">Please wait</div>
-          </div>
-
-          <div style="background:var(--surface2); border-radius:10px; padding:16px">
-            <div style="display:flex; justify-content:space-between; font-size:12px; color:var(--text2); margin-bottom:8px; font-family:var(--font-body)">
-              <span>Enhancement Progress</span>
-              <span id="blur-bar-pct-text">0%</span>
-            </div>
-            <div class="progress-bar-wrap" style="height:8px">
-              <div class="progress-bar enhancing" id="blur-prog-bar" style="width:0%"></div>
-            </div>
-            <div style="display:flex; gap:16px; margin-top:10px; font-size:11.5px; color:var(--text2); font-family:var(--font-body)">
-              <span id="blur-speed-text">⚡ —</span>
-              <span id="blur-eta-text">⏱️ ETA: —</span>
-              <span id="blur-elapsed-text">🕐 0s</span>
-            </div>
-          </div>
-
-          <div style="display:flex; justify-content:center; margin-top:16px">
-            <button class="btn btn-danger btn-sm" onclick="cancelBlurEnhance()">⏹ Cancel</button>
-          </div>
-
-        </div>
-
-        <!-- Result Box -->
-        <div class="enhance-result-box" id="blur-result-box">
-          <span class="result-icon">🎉</span>
-          <div class="result-title">Enhancement Complete!</div>
-          <div class="result-sub" id="blur-result-sub">
-            Your video has been sharpened, denoised and upscaled successfully.<br>
-            Click below to save it to your computer.
-          </div>
-          <div class="result-actions">
-            <button class="btn-download" id="blur-download-btn" onclick="downloadEnhancedVideo()">⬇️ Download Enhanced Video</button>
-            <button class="btn btn-secondary" id="blur-open-folder-btn" onclick="openFolder('')">📂 Open Folder</button>
-            <button class="btn btn-secondary" onclick="resetBlurEnhancer()">🔄 Enhance Another Video</button>
-          </div>
-        </div>
-
-        <!-- Start Button -->
-        <div id="blur-start-wrap" style="margin-top:8px">
-          <button class="btn btn-primary"
-                  id="blur-start-btn"
-                  style="width:100%; justify-content:center; padding:14px; font-size:15px"
-                  onclick="startBlurEnhance()">
-            ✨ Enhance Video Quality
-          </button>
-        </div>
-
-      </div>
-
-      <!-- ──────────────────────────────────────
            TAB: HISTORY
       ────────────────────────────────────────── -->
       <div id="tab-history" class="tab-panel">
@@ -1731,9 +1530,8 @@
       extractedImages: [],
       selectedImages:  new Set(),
       history:         [],
-      blurFile:        null,
-      blurJobId:       null,
-      blurFilePath:    null,
+      videoItemSeq:    0,      // unique id generator for video url-items
+      videoPreviews:   {},     // { itemId: true|false } — true once a successful preview exists for that item
     };
 
 
@@ -1742,7 +1540,6 @@
     ───────────────────────────────────────────── */
     document.addEventListener('DOMContentLoaded', () => {
       addUrlField('video-urls', 'video');
-      addUrlField('audio-urls', 'audio');
       addUrlField('image-urls', 'image');
       fetchAppInfo();
 
@@ -1758,11 +1555,9 @@
     const TAB_TITLES = {
       home:     '🏠 Home',
       video:    '🎬 Video Downloader',
-      audio:    '🎵 Audio Downloader',
       convert:  '🔄 Video to Audio',
       playlist: '📋 Playlist Downloader',
       images:   '🖼️ Image Downloader',
-      blur:     '✨ Blur → High Quality',
       history:  '🕓 Download History',
     };
 
@@ -1819,15 +1614,32 @@
       div.className   = 'url-item';
 
       const placeholder = {
-        video: 'https://youtube.com/watch?v=... or TikTok, Instagram, Twitter...',
-        audio: 'https://youtube.com/watch?v=... paste music/audio URL...',
+        video: 'https://youtube.com/watch?v=... or TikTok, Instagram, LinkedIn, Twitter...',
         image: 'https://example.com or https://example.com/image.jpg',
       }[type];
 
-      div.innerHTML = `
-        <input class="input url-input" type="url" placeholder="${placeholder}" value="${value}" />
-        <button class="btn-icon" title="Remove" onclick="this.parentElement.remove()">✕</button>
-      `;
+      if (type === 'video') {
+        // Video URLs get a Fetch/Preview flow before download is allowed.
+        const itemId = `vurl-${++state.videoItemSeq}`;
+        div.setAttribute('data-item-id', itemId);
+        div.innerHTML = `
+          <div class="vp-wrap">
+            <div class="url-fetch-row">
+              <input class="input url-input" type="url" placeholder="${placeholder}" value="${value}"
+                     oninput="onVideoUrlChanged('${itemId}')" />
+              <button class="btn btn-secondary btn-sm vp-fetch-btn" onclick="fetchVideoInfo('${itemId}')">🔍 Fetch</button>
+              <button class="btn-icon" title="Remove" onclick="removeVideoUrlItem('${itemId}')">✕</button>
+            </div>
+            <div class="vp-slot" id="vp-slot-${itemId}"></div>
+          </div>
+        `;
+      } else {
+        div.innerHTML = `
+          <input class="input url-input" type="url" placeholder="${placeholder}" value="${value}" />
+          <button class="btn-icon" title="Remove" onclick="this.parentElement.remove()">✕</button>
+        `;
+      }
+
       container.appendChild(div);
     }
 
@@ -1835,6 +1647,109 @@
       return [...document.querySelectorAll(`#${containerId} .url-input`)]
         .map(i => i.value.trim())
         .filter(Boolean);
+    }
+
+
+    /* ─────────────────────────────────────────────
+       VIDEO URL FETCH / PREVIEW  (new)
+    ───────────────────────────────────────────── */
+    function removeVideoUrlItem(itemId) {
+      delete state.videoPreviews[itemId];
+      document.querySelector(`#video-urls [data-item-id="${itemId}"]`)?.remove();
+      updateVideoDownloadBtnState();
+    }
+
+    function onVideoUrlChanged(itemId) {
+      // If the URL is edited after a successful fetch, the preview is stale — clear it
+      // and re-lock the download button (unless another item still has a valid preview).
+      if (state.videoPreviews[itemId]) {
+        state.videoPreviews[itemId] = false;
+        const slot = document.getElementById(`vp-slot-${itemId}`);
+        if (slot) slot.innerHTML = '';
+        updateVideoDownloadBtnState();
+      }
+    }
+
+    /**
+     * Only YouTube and Vimeo have a stable, public, CORS-free iframe embed
+     * URL pattern that works with nothing but a video ID. TikTok/Twitter
+     * "embeds" are actually a <blockquote> + third-party widget script that
+     * rewrites the DOM client-side — a materially bigger and less reliable
+     * footprint, so they're deliberately excluded here rather than faked.
+     * Instagram/Facebook/LinkedIn have no public embed path at all.
+     * Returns null when no real inline player is possible.
+     */
+    function getEmbedUrl(extractor, videoId) {
+      const ex = (extractor || '').toLowerCase();
+      if (!videoId) return null;
+      if (ex.includes('youtube')) return `https://www.youtube.com/embed/${videoId}`;
+      if (ex.includes('vimeo'))   return `https://player.vimeo.com/video/${videoId}`;
+      return null;
+    }
+
+    async function fetchVideoInfo(itemId) {
+      const item  = document.querySelector(`#video-urls [data-item-id="${itemId}"]`);
+      if (!item) return;
+      const input = item.querySelector('.url-input');
+      const btn   = item.querySelector('.vp-fetch-btn');
+      const slot  = document.getElementById(`vp-slot-${itemId}`);
+      const url   = input.value.trim();
+
+      if (!url) { showToast('Enter a URL first', 'error'); return; }
+
+      const originalBtnHtml = btn.innerHTML;
+      btn.disabled  = true;
+      btn.innerHTML = '<span class="spinner"></span>';
+
+      try {
+        const data     = await apiFetch('/api/video-info', { url });
+        const embedUrl = getEmbedUrl(data.extractor, data.id);
+
+        const mediaHtml = embedUrl
+          ? `<iframe src="${escHtml(embedUrl)}"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowfullscreen loading="lazy"></iframe>`
+          : `<img src="${escHtml(data.thumbnail || '')}" onerror="this.src=''" loading="lazy" />`;
+
+        slot.innerHTML = `
+          <div class="video-preview-card ${embedUrl ? 'vp-has-embed' : ''}">
+            <div class="vp-media">${mediaHtml}</div>
+            <div class="vp-info">
+              <div class="vp-title">${escHtml(data.title || 'Untitled')}</div>
+              <div class="vp-meta">
+                ${data.uploader ? `👤 ${escHtml(data.uploader)}` : ''}
+                ${data.uploader && data.duration ? ' · ' : ''}
+                ${data.duration ? `⏱️ ${formatDuration(data.duration)}` : ''}
+                ${!embedUrl && !data.uploader && !data.duration ? 'Preview unavailable for inline playback on this source' : ''}
+              </div>
+            </div>
+          </div>`;
+
+        state.videoPreviews[itemId] = true;
+        updateVideoDownloadBtnState();
+
+      } catch (e) {
+        slot.innerHTML = `
+          <div class="video-preview-card vp-error">
+            <div class="vp-info">
+              <div class="vp-title">❌ Could not load preview</div>
+              <div class="vp-meta">${escHtml(e.message || 'Unsupported or private video')}</div>
+            </div>
+          </div>`;
+        state.videoPreviews[itemId] = false;
+        showToast(e.message || 'Failed to fetch video info', 'error');
+        updateVideoDownloadBtnState();
+
+      } finally {
+        btn.disabled  = false;
+        btn.innerHTML = originalBtnHtml;
+      }
+    }
+
+    function updateVideoDownloadBtnState() {
+      // Enabled once at least one URL has a successful preview.
+      const hasSuccessfulPreview = Object.values(state.videoPreviews).some(Boolean);
+      document.getElementById('video-download-btn').disabled = !hasSuccessfulPreview;
     }
 
 
@@ -1935,30 +1850,6 @@
         showToast('Starting download...', 'info', 2000);
         const res = await apiFetch('/api/download', data);
         listenProgress(res.job_id, 'video-progress-area');
-      } catch(e) {
-        showToast(e.message, 'error');
-      }
-    }
-
-
-    /* ─────────────────────────────────────────────
-       AUDIO DOWNLOAD
-    ───────────────────────────────────────────── */
-    async function startAudioDownload() {
-      const urls = getUrlValues('audio-urls');
-      if (!urls.length) { showToast('Please enter at least one URL', 'error'); return; }
-
-      const data = {
-        urls,
-        tab:           'audio',
-        format:        document.getElementById('a-format').value,
-        audio_quality: document.getElementById('a-quality').value,
-      };
-
-      try {
-        showToast('Starting audio download...', 'info', 2000);
-        const res = await apiFetch('/api/download', data);
-        listenProgress(res.job_id, 'audio-progress-area');
       } catch(e) {
         showToast(e.message, 'error');
       }
@@ -2204,191 +2095,6 @@
 
 
     /* ─────────────────────────────────────────────
-       BLUR ENHANCER
-    ───────────────────────────────────────────── */
-    function blurDragOver(e)  { e.preventDefault(); document.getElementById('blur-dropzone').classList.add('dragover'); }
-    function blurDragLeave(e) { document.getElementById('blur-dropzone').classList.remove('dragover'); }
-
-    function blurDropFile(e) {
-      e.preventDefault();
-      blurDragLeave(e);
-      const f = e.dataTransfer.files[0];
-      if (f) blurProcessFile(f);
-    }
-
-    function blurFileSelected(input) {
-      if (input.files[0]) blurProcessFile(input.files[0]);
-    }
-
-    function blurProcessFile(file) {
-      state.blurFile = file;
-      const info = document.getElementById('blur-file-info');
-      info.style.display = 'flex';
-      document.getElementById('blur-file-details').innerHTML = `
-        <div style="font-weight:600; font-family:var(--font-body)">${escHtml(file.name)}</div>
-        <div style="font-size:12px; color:var(--text2); margin-top:2px; font-family:var(--font-body)">
-          ${(file.size / 1024 / 1024).toFixed(2)} MB · ${file.type || 'video'}
-        </div>`;
-      document.getElementById('blur-dropzone').querySelector('p').textContent = '✅ ' + file.name;
-      showToast('Video loaded! Ready to enhance.', 'success', 2500);
-    }
-
-    async function startBlurEnhance() {
-      if (!state.blurFile) { showToast('Please upload a video file first', 'error'); return; }
-
-      // Dim cards, hide start btn, show progress
-      document.getElementById('blur-upload-card').style.opacity  = '0.4';
-      document.getElementById('blur-settings-card').style.opacity = '0.4';
-      document.getElementById('blur-start-wrap').style.display   = 'none';
-      document.getElementById('blur-result-box').classList.remove('show');
-
-      const proc = document.getElementById('blur-processing-box');
-      proc.style.display = 'block';
-      proc.classList.add('show');
-
-      setBlurRing(0);
-      setBlurLabel('Uploading video...', 'Sending to FFmpeg pipeline');
-
-      // Upload
-      const fd = new FormData();
-      fd.append('file',          state.blurFile);
-      fd.append('level',         document.getElementById('blur-level').value);
-      fd.append('resolution',    document.getElementById('blur-res').value);
-      fd.append('output_format', document.getElementById('blur-format').value);
-      fd.append('keep_original', document.getElementById('blur-keep-orig').checked ? '1' : '0');
-
-      let res;
-      try {
-        res = await fetch('/api/enhance', { method: 'POST', body: fd });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || 'Upload failed');
-        state.blurJobId = data.job_id;
-      } catch(e) {
-        showToast(e.message, 'error');
-        resetBlurUI();
-        return;
-      }
-
-      // Poll SSE progress
-      const es        = new EventSource(`/api/progress/${state.blurJobId}`);
-      const startTime = Date.now();
-
-      es.onmessage = e => {
-        const job = JSON.parse(e.data);
-        const pct = job.progress || 0;
-
-        setBlurRing(pct);
-        document.getElementById('blur-pct-text').textContent      = pct + '%';
-        document.getElementById('blur-bar-pct-text').textContent   = pct + '%';
-        document.getElementById('blur-prog-bar').style.width       = pct + '%';
-
-        const elapsed = Math.round((Date.now() - startTime) / 1000);
-        document.getElementById('blur-elapsed-text').textContent = `🕐 ${elapsed}s`;
-        if (job.speed) document.getElementById('blur-speed-text').textContent = `⚡ ${job.speed}`;
-        if (job.eta)   document.getElementById('blur-eta-text').textContent   = `⏱️ ETA: ${job.eta}`;
-
-        // Stage labels by progress %
-        if      (pct < 10) setBlurLabel('Uploading & analyzing...',   'Reading codec and frame data');
-        else if (pct < 25) setBlurLabel('Applying sharpening...',     'Unsharp mask & edge enhancement');
-        else if (pct < 45) setBlurLabel('Reducing noise...',          'Temporal + spatial denoise pass');
-        else if (pct < 65) setBlurLabel('Boosting contrast...',       'Histogram & gamma correction');
-        else if (pct < 80) setBlurLabel('Upscaling resolution...',    'Bicubic upscale to target resolution');
-        else if (pct < 95) setBlurLabel('Re-encoding video...',       'H.264 high quality preset');
-        else               setBlurLabel('Finalizing...',              'Muxing audio + video streams');
-
-        if (job.status === 'done') {
-          es.close();
-          state.blurFilePath = job.filepath;
-          blurEnhanceDone(job);
-        }
-        if (job.status === 'error') {
-          es.close();
-          showToast(job.error || 'Enhancement failed', 'error');
-          resetBlurUI();
-        }
-        if (job.status === 'cancelled') {
-          es.close();
-          resetBlurUI();
-        }
-      };
-
-      es.onerror = () => {
-        es.close();
-        showToast('Connection lost during enhancement', 'error');
-        resetBlurUI();
-      };
-    }
-
-    function setBlurRing(pct) {
-      const circumference = 2 * Math.PI * 45;
-      const offset        = circumference - (circumference * pct / 100);
-      document.getElementById('blur-ring').style.strokeDashoffset = offset;
-      document.getElementById('blur-ring').style.strokeDasharray  = circumference;
-    }
-
-    function setBlurLabel(label, sub) {
-      document.getElementById('blur-stage-label').textContent = label;
-      document.getElementById('blur-stage-sub').textContent   = sub;
-    }
-
-    function blurEnhanceDone(job) {
-      document.getElementById('blur-processing-box').style.display = 'none';
-      const resultBox = document.getElementById('blur-result-box');
-      resultBox.classList.add('show');
-
-      const fname = job.filename || 'enhanced video';
-      document.getElementById('blur-result-sub').innerHTML = `
-        Your video <strong>${escHtml(fname)}</strong> has been sharpened, denoised and upscaled.<br>
-        Click <strong>Download Enhanced Video</strong> to save it to your computer.`;
-
-      showToast('Enhancement complete! 🎉', 'success', 5000);
-    }
-
-    function downloadEnhancedVideo() {
-      if (!state.blurJobId) { showToast('No enhanced video available', 'error'); return; }
-      const a = document.createElement('a');
-      a.href = `/api/download-file/${state.blurJobId}`;
-      a.setAttribute('download', '');
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      showToast('Downloading enhanced video...', 'success', 3000);
-    }
-
-    function cancelBlurEnhance() {
-      if (state.blurJobId) {
-        apiFetch(`/api/cancel/${state.blurJobId}`, null, 'POST').catch(() => {});
-      }
-      resetBlurUI();
-      showToast('Enhancement cancelled', 'warning');
-    }
-
-    function resetBlurUI() {
-      document.getElementById('blur-processing-box').style.display   = 'none';
-      document.getElementById('blur-upload-card').style.opacity      = '1';
-      document.getElementById('blur-settings-card').style.opacity    = '1';
-      document.getElementById('blur-start-wrap').style.display       = 'block';
-      setBlurRing(0);
-      document.getElementById('blur-pct-text').textContent      = '0%';
-      document.getElementById('blur-prog-bar').style.width       = '0%';
-      document.getElementById('blur-bar-pct-text').textContent   = '0%';
-      document.getElementById('blur-speed-text').textContent     = '⚡ —';
-      document.getElementById('blur-eta-text').textContent       = '⏱️ ETA: —';
-      document.getElementById('blur-elapsed-text').textContent   = '🕐 0s';
-    }
-
-    function resetBlurEnhancer() {
-      state.blurFile = null; state.blurJobId = null; state.blurFilePath = null;
-      resetBlurUI();
-      document.getElementById('blur-result-box').classList.remove('show');
-      document.getElementById('blur-file-info').style.display = 'none';
-      document.getElementById('blur-dropzone').querySelector('p').textContent = 'Drag & Drop your blurry video here';
-      document.getElementById('blur-file-input').value = '';
-      setBlurLabel('Uploading video...', 'Please wait');
-    }
-
-
-    /* ─────────────────────────────────────────────
        MISC HELPERS
     ───────────────────────────────────────────── */
     async function cancelJob(jobId) {
@@ -2416,7 +2122,7 @@
         list.innerHTML = '<div style="padding:50px; text-align:center; color:var(--text2); font-family:var(--font-body)">No downloads yet.</div>';
         return;
       }
-      const icons = { video: '🎬', audio: '🎵', convert: '🔄', playlist: '📋', images: '🖼️', enhance: '✨' };
+      const icons = { video: '🎬', convert: '🔄', playlist: '📋', images: '🖼️', enhance: '✨' };
       list.innerHTML = state.history.map(j => `
         <div class="history-item">
           <span class="history-icon">${icons[j.type] || '📁'}</span>

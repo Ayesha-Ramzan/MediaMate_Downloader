@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 myenv/
 .env
+
+# myenv\Scripts\uvicorn.exe app:app --port 8000 --reload

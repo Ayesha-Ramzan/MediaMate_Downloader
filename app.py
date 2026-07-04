@@ -608,7 +608,7 @@ def video_info(req: VideoInfoRequest):
     if not url:
         raise HTTPException(400, "URL is required")
 
-   ydl_opts = {
+    ydl_opts = {
         "quiet":         True,
         "no_warnings":   True,
         "skip_download": True,   # belt-and-braces alongside download=False
@@ -653,7 +653,6 @@ def video_info(req: VideoInfoRequest):
     except Exception as e:
         logger.exception(f"Unexpected error in video_info for {url}")
         raise HTTPException(400, f"Could not fetch video info: {str(e)[:300]}")
-
 
 # ── Start download ────────────────────────────
 @app.post("/api/download")

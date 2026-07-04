@@ -344,8 +344,10 @@ def build_ydl_opts(job_id: str, out_dir: Path, req) -> dict:
             "preferredquality": audio_quality,
         }]
     else:
-        opts["format"]              = "bestvideo*+bestaudio/best"
-        opts["format_sort"]         = format_sort_str
+        # Use a flexible format string allowing yt-dlp to choose the best available.
+        # If a specific quality (max_height) is requested, filter video by that height.
+        video_format = f"bestvideo[height<=?{max_height}]+bestaudio" if max_height > 0 else "bestvideo+bestaudio"
+        opts["format"]              = f"{video_format}/best"
         opts["merge_output_format"] = fmt
         opts["postprocessors"]      = []
 
@@ -606,7 +608,7 @@ def video_info(req: VideoInfoRequest):
     if not url:
         raise HTTPException(400, "URL is required")
 
-    ydl_opts = {
+   ydl_opts = {
         "quiet":         True,
         "no_warnings":   True,
         "skip_download": True,   # belt-and-braces alongside download=False
@@ -619,6 +621,11 @@ def video_info(req: VideoInfoRequest):
     # errors on YouTube for metadata fetches too.
     if COOKIES_PATH.exists():
         ydl_opts["cookiefile"] = str(COOKIES_PATH)
+
+    # YouTube-specific: use mobile-web client for better format detection
+    # (especially for Shorts) — same fix applied in build_ydl_opts().
+    if any(s in url for s in ["youtube.com", "youtu.be"]):
+        ydl_opts["extractor_args"] = {"youtube": {"player_client": ["mweb", "web_safari"]}}
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -647,6 +654,7 @@ def video_info(req: VideoInfoRequest):
         logger.exception(f"Unexpected error in video_info for {url}")
         raise HTTPException(400, f"Could not fetch video info: {str(e)[:300]}")
 
+
 # ── Start download ────────────────────────────
 @app.post("/api/download")
 def start_download(req: DownloadRequest, background_tasks: BackgroundTasks):
@@ -665,7 +673,6 @@ def start_download(req: DownloadRequest, background_tasks: BackgroundTasks):
         ydl_opts, req.enhance, req.keep_original,
     )
     return {"job_id": job_id, "folder": str(out_dir)}
-
 
 # ── Serve completed file to browser ──────────
 @app.get("/api/download-file/{job_id}")

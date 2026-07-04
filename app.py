@@ -299,14 +299,27 @@ def build_ydl_opts(job_id: str, out_dir: Path, req) -> dict:
     quality = getattr(req, "quality",       "best")
     tab     = getattr(req, "tab",           "video")
 
-    quality_map = {
-        "4k":    "bestvideo[height<=2160]+bestaudio/best",
-        "1080p": "bestvideo[height<=1080]+bestaudio/best",
-        "720p":  "bestvideo[height<=720]+bestaudio/best",
-        "480p":  "bestvideo[height<=480]+bestaudio/best",
-        "360p":  "bestvideo[height<=360]+bestaudio/best",
+    # Dynamic format selection and sorting based on requested quality
+    quality_max_height = {
+        "4k":    2160,
+        "1080p": 1080,
+        "720p":  720,
+        "480p":  480,
+        "360p":  360,
     }
-    format_str = quality_map.get(quality, "bestvideo+bestaudio/best")
+    max_height = quality_max_height.get(quality, 0)  # 0 = no height limit
+
+    format_sort_parts = [
+        "vcodec:av01",
+        "vcodec:vp9",
+        "vcodec:h264",
+    ]
+    if max_height > 0:
+        format_sort_parts.append(f"height:{max_height}")
+    else:
+        format_sort_parts.append("height")
+    format_sort_parts.extend(["fps", "abr", "br"])
+    format_sort_str = ",".join(format_sort_parts)
 
     opts = {
         "outtmpl":     str(out_dir / "%(title)s.%(ext)s"),
@@ -314,7 +327,6 @@ def build_ydl_opts(job_id: str, out_dir: Path, req) -> dict:
         "quiet":       True,
         "no_warnings": True,
         "noplaylist":  True,
-        # Retries & timeouts — important for HF Spaces networking
         "retries":         5,
         "fragment_retries": 5,
         "socket_timeout":  30,
@@ -332,9 +344,10 @@ def build_ydl_opts(job_id: str, out_dir: Path, req) -> dict:
             "preferredquality": audio_quality,
         }]
     else:
-        opts["format"]               = format_str
-        opts["merge_output_format"]  = fmt
-        opts["postprocessors"]       = []
+        opts["format"]              = "bestvideo*+bestaudio/best"
+        opts["format_sort"]         = format_sort_str
+        opts["merge_output_format"] = fmt
+        opts["postprocessors"]      = []
 
         sub_lang = getattr(req, "subtitle_lang", "none")
         if sub_lang != "none":
@@ -349,13 +362,11 @@ def build_ydl_opts(job_id: str, out_dir: Path, req) -> dict:
     if COOKIES_PATH.exists():
         opts["cookiefile"] = str(COOKIES_PATH)
 
-
-    # NOTE: No special-casing is needed here for LinkedIn (or any other
-    # source) — yt-dlp auto-detects the correct extractor from the URL.
-    # LinkedIn's extractor only supports public post videos; private or
-    # login-gated feed videos will raise a DownloadError, which the
-    # download worker / video-info endpoint translate into a friendly
-    # message below.
+    # YouTube-specific: use mobile-web client, which tends to expose
+    # more formats (especially for Shorts) than the default client.
+    urls = getattr(req, "urls", None)
+    if urls and any(s in urls[0] for s in ["youtube.com", "youtu.be"]):
+        opts["extractor_args"] = {"youtube": {"player_client": ["mweb", "web_safari"]}}
 
     return opts
 

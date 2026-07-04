@@ -79,17 +79,12 @@ for d in [DOWNLOADS_DIR, UPLOADS_DIR]:
 # ─────────────────────────────────────────────
 #  YOUTUBE COOKIES (from Render env var, base64-encoded)
 # ─────────────────────────────────────────────
-import base64
-
-COOKIES_PATH = BASE_DIR / "cookies.txt"
-
-def setup_cookies():
-    b64 = os.environ.get("YTDLP_COOKIES_B64", "")
-    if b64:
-        COOKIES_PATH.write_bytes(base64.b64decode(b64))
-
-setup_cookies()
-
+# ─────────────────────────────────────────────
+#  YOUTUBE COOKIES (Render Secret File)
+#  Render mounts secret files at /etc/secrets/<filename> at runtime.
+# ─────────────────────────────────────────────
+_render_secret_cookies = Path("/etc/secrets/cookies.txt")
+COOKIES_PATH = _render_secret_cookies if _render_secret_cookies.exists() else BASE_DIR / "cookies.txt"
 # ─────────────────────────────────────────────
 #  IN-MEMORY JOB STORE
 #  No persistence layer here — jobs live only as long as the process does,

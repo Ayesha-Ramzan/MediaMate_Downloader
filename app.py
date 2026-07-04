@@ -77,6 +77,20 @@ for d in [DOWNLOADS_DIR, UPLOADS_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 # ─────────────────────────────────────────────
+#  YOUTUBE COOKIES (from Render env var, base64-encoded)
+# ─────────────────────────────────────────────
+import base64
+
+COOKIES_PATH = BASE_DIR / "cookies.txt"
+
+def setup_cookies():
+    b64 = os.environ.get("YTDLP_COOKIES_B64", "")
+    if b64:
+        COOKIES_PATH.write_bytes(base64.b64decode(b64))
+
+setup_cookies()
+
+# ─────────────────────────────────────────────
 #  IN-MEMORY JOB STORE
 #  No persistence layer here — jobs live only as long as the process does,
 #  by design (this is a single-instance local/HF-Spaces app, not a
@@ -329,6 +343,10 @@ def build_ydl_opts(job_id: str, out_dir: Path, req) -> dict:
                     "already_have_subtitle": False,
                 })
 
+    if COOKIES_PATH.exists():
+        opts["cookiefile"] = str(COOKIES_PATH)
+
+
     # NOTE: No special-casing is needed here for LinkedIn (or any other
     # source) — yt-dlp auto-detects the correct extractor from the URL.
     # LinkedIn's extractor only supports public post videos; private or
@@ -553,6 +571,7 @@ def get_info():
     }
 
 
+
 # ── Video metadata (preview before download) ──
 @app.post("/api/video-info")
 def video_info(req: VideoInfoRequest):
@@ -582,6 +601,11 @@ def video_info(req: VideoInfoRequest):
         "noplaylist":    True,
     }
 
+    # Use saved YouTube cookies if available — helps bypass bot-detection
+    # errors on YouTube for metadata fetches too.
+    if COOKIES_PATH.exists():
+        ydl_opts["cookiefile"] = str(COOKIES_PATH)
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -608,7 +632,6 @@ def video_info(req: VideoInfoRequest):
     except Exception as e:
         logger.exception(f"Unexpected error in video_info for {url}")
         raise HTTPException(400, f"Could not fetch video info: {str(e)[:300]}")
-
 
 # ── Start download ────────────────────────────
 @app.post("/api/download")
@@ -776,6 +799,7 @@ async def convert_video(
     return {"job_id": job_id}
 
 
+
 # ── Playlist info ─────────────────────────────
 @app.post("/api/playlist-info")
 def playlist_info(req: PlaylistInfoRequest):
@@ -787,6 +811,12 @@ def playlist_info(req: PlaylistInfoRequest):
             "extract_flat": True,
             "socket_timeout": 20,
         }
+
+        # Use saved YouTube cookies if available — needed for age-restricted
+        # or bot-detection-protected playlists.
+        if COOKIES_PATH.exists():
+            opts["cookiefile"] = str(COOKIES_PATH)
+
         with yt_dlp.YoutubeDL(opts) as ydl:
             info    = ydl.extract_info(req.url, download=False)
             entries = info.get("entries", []) or []

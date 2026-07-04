@@ -235,6 +235,8 @@ def is_youtube_url(url: str) -> bool:
 #  every option has been exhausted.
 # ─────────────────────────────────────────────
 YOUTUBE_CLIENT_FALLBACK_CHAIN = [
+    ["android_vr"],          # confirmed working via local `yt-dlp -F` test for
+                              # Shorts that fail on other clients - try first
     ["mweb", "web_safari"],
     ["android"],
     ["ios"],

@@ -1,4 +1,5 @@
 import os
+import sys
 import uuid
 import asyncio
 import subprocess
@@ -36,7 +37,7 @@ logger = logging.getLogger("mediamate")
 # ─────────────────────────────────────────────
 #  APP SETUP
 # ─────────────────────────────────────────────
-app = FastAPI(title="Video Downloader API", version="2.1.1")
+app = FastAPI(title="Video Downloader API", version="2.2.0")
 
 # ── CORS ──────────────────────────────────────
 # Add your Vercel URL(s) here. Wildcards are not
@@ -77,7 +78,6 @@ for d in [DOWNLOADS_DIR, UPLOADS_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 # ─────────────────────────────────────────────
-# ─────────────────────────────────────────────
 #  YOUTUBE COOKIES (Render Secret File)
 #  Render mounts secret files read-only at /etc/secrets/<filename>,
 #  but yt-dlp needs to write/update the cookies file during use —
@@ -93,6 +93,18 @@ def setup_cookies():
         _shutil.copyfile(_render_secret_cookies, COOKIES_PATH)
 
 setup_cookies()
+
+# Log the yt-dlp version at startup — this is the #1 cause of "Requested
+# format is not available" errors on YouTube (an outdated yt-dlp doesn't
+# know about YouTube's latest player/streaming changes), so it should be
+# visible in your logs immediately instead of only discoverable via /api/info.
+try:
+    _ver = subprocess.run(["yt-dlp", "--version"], capture_output=True,
+                          text=True, timeout=10).stdout.strip()
+    logger.info(f"yt-dlp version at startup: {_ver}")
+except Exception:
+    logger.warning("Could not determine yt-dlp version at startup")
+
 # ─────────────────────────────────────────────
 #  IN-MEMORY JOB STORE
 #  No persistence layer here — jobs live only as long as the process does,
@@ -178,6 +190,22 @@ def is_login_required_error(error_message: str) -> bool:
     return any(hint in msg for hint in LOGIN_REQUIRED_HINTS)
 
 
+# Substring that specifically identifies the "no matching format" failure
+# mode (as opposed to login/permission errors, network errors, etc.) so we
+# know when it's worth retrying with a different YouTube player client
+# rather than giving up immediately.
+FORMAT_UNAVAILABLE_HINTS = [
+    "requested format is not available",
+    "no video formats found",
+    "unable to extract",
+]
+
+
+def is_format_unavailable_error(error_message: str) -> bool:
+    msg = (error_message or "").lower()
+    return any(hint in msg for hint in FORMAT_UNAVAILABLE_HINTS)
+
+
 def friendly_extractor_error(url: str, error_message: str) -> str:
     """
     Turn a raw yt-dlp error into a clearer message for the user, with a
@@ -189,6 +217,72 @@ def friendly_extractor_error(url: str, error_message: str) -> str:
                     "can't be downloaded.")
         return "This video is private or requires login and can't be downloaded."
     return f"Could not process this URL: {error_message[:300]}"
+
+
+def is_youtube_url(url: str) -> bool:
+    return any(s in url for s in ["youtube.com", "youtu.be"])
+
+
+# ─────────────────────────────────────────────
+#  YOUTUBE CLIENT FALLBACK CHAIN
+#
+#  Root-cause fix for "Requested format is not available" on YouTube
+#  (very common on Shorts): YouTube periodically breaks format extraction
+#  for specific "innertube" player clients while leaving others working.
+#  Previously the app hardcoded a single client pair (mweb + web_safari)
+#  and simply failed if that pair didn't work for a given video. Now we
+#  try a sequence of client combinations and only surface an error once
+#  every option has been exhausted.
+# ─────────────────────────────────────────────
+YOUTUBE_CLIENT_FALLBACK_CHAIN = [
+    ["mweb", "web_safari"],
+    ["android"],
+    ["ios"],
+    ["tv_embedded"],
+    None,  # None = don't set extractor_args at all, let yt-dlp use its own default
+]
+
+
+def extract_info_robust(url: str, base_opts: dict, download: bool = False):
+    """
+    Try extracting info (optionally downloading) for a URL, retrying across
+    several YouTube player clients when the failure looks like a
+    format-availability problem. For non-YouTube URLs this just makes a
+    single attempt with base_opts, matching the previous behavior.
+
+    Raises the last yt_dlp.utils.DownloadError encountered if every
+    attempt fails.
+    """
+    if not is_youtube_url(url):
+        with yt_dlp.YoutubeDL(base_opts) as ydl:
+            return ydl.extract_info(url, download=download)
+
+    last_error: Optional[Exception] = None
+    for clients in YOUTUBE_CLIENT_FALLBACK_CHAIN:
+        opts = dict(base_opts)
+        if clients is not None:
+            opts["extractor_args"] = {"youtube": {"player_client": clients}}
+        else:
+            opts.pop("extractor_args", None)
+
+        try:
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                return ydl.extract_info(url, download=download)
+        except yt_dlp.utils.DownloadError as e:
+            last_error = e
+            if is_format_unavailable_error(str(e)):
+                logger.warning(
+                    f"YouTube client {clients} failed for {url} "
+                    f"(format unavailable), trying next fallback..."
+                )
+                continue
+            # Not a format-availability error (e.g. private video, login
+            # required, network error) — retrying with a different client
+            # won't help, so fail fast instead of burning through the chain.
+            raise
+
+    # Exhausted every client in the chain — surface the last real error.
+    raise last_error
 
 
 # ─────────────────────────────────────────────
@@ -319,7 +413,6 @@ def build_ydl_opts(job_id: str, out_dir: Path, req) -> dict:
     else:
         format_sort_parts.append("height")
     format_sort_parts.extend(["fps", "abr", "br"])
-    format_sort_str = ",".join(format_sort_parts)
 
     opts = {
         "outtmpl":     str(out_dir / "%(title)s.%(ext)s"),
@@ -330,6 +423,11 @@ def build_ydl_opts(job_id: str, out_dir: Path, req) -> dict:
         "retries":         5,
         "fragment_retries": 5,
         "socket_timeout":  30,
+        # BUG FIX: format_sort_parts was built above but never actually
+        # applied to the ydl options, so codec/quality preference sorting
+        # was silently a no-op. yt-dlp accepts format_sort as a list of
+        # sort-field strings.
+        "format_sort": format_sort_parts,
     }
 
     audio_formats = {"mp3", "aac", "flac", "wav", "ogg", "m4a", "opus"}
@@ -364,11 +462,10 @@ def build_ydl_opts(job_id: str, out_dir: Path, req) -> dict:
     if COOKIES_PATH.exists():
         opts["cookiefile"] = str(COOKIES_PATH)
 
-    # YouTube-specific: use mobile-web client, which tends to expose
-    # more formats (especially for Shorts) than the default client.
-    urls = getattr(req, "urls", None)
-    if urls and any(s in urls[0] for s in ["youtube.com", "youtu.be"]):
-        opts["extractor_args"] = {"youtube": {"player_client": ["mweb", "web_safari"]}}
+    # NOTE: YouTube player_client is no longer hardcoded here. It's applied
+    # per-attempt by extract_info_robust()/download_worker() instead, which
+    # tries a fallback chain of clients rather than a single fixed pair.
+    # This is the fix for "Requested format is not available" on Shorts.
 
     return opts
 
@@ -386,11 +483,17 @@ def download_worker(job_id: str, urls: List[str], out_dir: Path,
             if jobs.get(job_id, {}).get("status") == "cancelled":
                 return
 
-            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = ydl.extract_info(url, download=True)
-                if info:
+            # Uses the robust multi-client fallback chain instead of a
+            # single fixed yt-dlp instance, so a video that fails under
+            # one YouTube player client automatically retries under
+            # another before actually failing the job.
+            info = extract_info_robust(url, ydl_opts, download=True)
+            if info:
+                # prepare_filename needs a YoutubeDL instance; opts are
+                # the same regardless of which client ultimately succeeded.
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
                     filename = ydl.prepare_filename(info)
-                    downloaded_files.append(filename)
+                downloaded_files.append(filename)
 
         # ── Optional FFmpeg enhancement ──
         if enhance and downloaded_files:
@@ -578,7 +681,7 @@ def get_info():
         ytdlp_ver = "unknown"
 
     return {
-        "version":       "2.1.1",
+        "version":       "2.2.0",
         "ytdlp_version": ytdlp_ver,
         "platform":      platform.system(),
         "base_dir":      str(BASE_DIR),
@@ -622,14 +725,12 @@ def video_info(req: VideoInfoRequest):
     if COOKIES_PATH.exists():
         ydl_opts["cookiefile"] = str(COOKIES_PATH)
 
-    # YouTube-specific: use mobile-web client for better format detection
-    # (especially for Shorts) — same fix applied in build_ydl_opts().
-    if any(s in url for s in ["youtube.com", "youtu.be"]):
-        ydl_opts["extractor_args"] = {"youtube": {"player_client": ["mweb", "web_safari"]}}
-
     try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=False)
+        # Uses the robust multi-client fallback chain (see
+        # extract_info_robust) instead of a single fixed client pair, which
+        # is the fix for "Requested format is not available" on YouTube
+        # Shorts previews.
+        info = extract_info_robust(url, ydl_opts, download=False)
 
         if not info:
             raise HTTPException(400, "Could not extract any information from this URL.")
@@ -798,8 +899,7 @@ async def convert_video(
                     subtitle_lang="none",
                 )
                 ydl_opts = build_ydl_opts(job_id, CONVERTED_DIR, audio_req)
-                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                    ydl.download([url])
+                extract_info_robust(url, ydl_opts, download=True)
                 update_job(job_id, status="done", progress=100,
                            message="Conversion complete")
 
@@ -837,24 +937,23 @@ def playlist_info(req: PlaylistInfoRequest):
         if COOKIES_PATH.exists():
             opts["cookiefile"] = str(COOKIES_PATH)
 
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            info    = ydl.extract_info(req.url, download=False)
-            entries = info.get("entries", []) or []
-            videos  = [
-                {
-                    "title":     e.get("title", "Untitled"),
-                    "url":       e.get("url") or e.get("webpage_url", ""),
-                    "duration":  e.get("duration"),
-                    "thumbnail": e.get("thumbnail", ""),
-                }
-                for e in entries if e
-            ]
-            return {
-                "title":    info.get("title", "Playlist"),
-                "uploader": info.get("uploader", ""),
-                "count":    len(videos),
-                "videos":   videos,
+        info    = extract_info_robust(req.url, opts, download=False)
+        entries = (info or {}).get("entries", []) or []
+        videos  = [
+            {
+                "title":     e.get("title", "Untitled"),
+                "url":       e.get("url") or e.get("webpage_url", ""),
+                "duration":  e.get("duration"),
+                "thumbnail": e.get("thumbnail", ""),
             }
+            for e in entries if e
+        ]
+        return {
+            "title":    (info or {}).get("title", "Playlist"),
+            "uploader": (info or {}).get("uploader", ""),
+            "count":    len(videos),
+            "videos":   videos,
+        }
     except yt_dlp.utils.DownloadError as e:
         raise HTTPException(400, friendly_extractor_error(req.url, str(e)))
     except Exception as e:
@@ -1056,14 +1155,24 @@ def open_folder(path: str = ""):
 @app.post("/api/update-ytdlp")
 def update_ytdlp():
     try:
+        # BUG FIX: bare "pip" can resolve to a different Python installation
+        # than the one actually running this app (common on Render/HF
+        # Spaces with multiple Python versions on PATH), so an "update"
+        # could silently patch the wrong interpreter and have zero effect
+        # on the yt-dlp actually used here. `sys.executable -m pip`
+        # guarantees it targets the exact interpreter running this process.
         result = subprocess.run(
-            ["pip", "install", "--upgrade", "yt-dlp"],
+            [sys.executable, "-m", "pip", "install", "--upgrade", "yt-dlp"],
             capture_output=True, text=True, timeout=120,
         )
+        if result.returncode != 0:
+            raise HTTPException(500, result.stderr[-500:] or "pip install failed")
         return {
             "message": "yt-dlp updated successfully!",
             "output":  result.stdout[-300:],
         }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(500, str(e))
 

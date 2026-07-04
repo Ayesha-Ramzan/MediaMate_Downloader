@@ -77,14 +77,22 @@ for d in [DOWNLOADS_DIR, UPLOADS_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 # ─────────────────────────────────────────────
-#  YOUTUBE COOKIES (from Render env var, base64-encoded)
-# ─────────────────────────────────────────────
 # ─────────────────────────────────────────────
 #  YOUTUBE COOKIES (Render Secret File)
-#  Render mounts secret files at /etc/secrets/<filename> at runtime.
+#  Render mounts secret files read-only at /etc/secrets/<filename>,
+#  but yt-dlp needs to write/update the cookies file during use —
+#  so we copy it into a writable location first.
 # ─────────────────────────────────────────────
+import shutil as _shutil
+
+COOKIES_PATH = BASE_DIR / "cookies.txt"
 _render_secret_cookies = Path("/etc/secrets/cookies.txt")
-COOKIES_PATH = _render_secret_cookies if _render_secret_cookies.exists() else BASE_DIR / "cookies.txt"
+
+def setup_cookies():
+    if _render_secret_cookies.exists():
+        _shutil.copyfile(_render_secret_cookies, COOKIES_PATH)
+
+setup_cookies()
 # ─────────────────────────────────────────────
 #  IN-MEMORY JOB STORE
 #  No persistence layer here — jobs live only as long as the process does,

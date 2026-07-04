@@ -42,7 +42,7 @@ app = FastAPI(title="Video Downloader API", version="2.1.1")
 # Add your Vercel URL(s) here. Wildcards are not
 # allowed with credentials, so list them explicitly.
 ALLOWED_ORIGINS = [
-    "https://my-video-dow-app.vercel.app",   # ← replace with your actual Vercel URL
+    "https://media-mate-downloader.vercel.app",
     "http://localhost:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",

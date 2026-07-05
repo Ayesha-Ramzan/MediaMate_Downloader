@@ -11,7 +11,7 @@
 
 ### Optional Variables
 
-- **BASE_DIR**: Base directory for storage (default: `/mnt/data/mediamate` on Render, `/tmp/Downloader` locally)
+- **BASE_DIR**: Base directory for storage (default: `/tmp/mediamate`)
 - **HOST**: Server bind address (default: `0.0.0.0`)
 
 ## Frontend (Vercel)
@@ -48,11 +48,7 @@
    - **Build Command**: `pip install -r requirements.txt`
    - **Start Command**: `python app.py`
 6. Add environment variables (see above)
-7. Add persistent disk:
-   - **Name**: mediamate-storage
-   - **Mount Path**: `/mnt/data`
-   - **Size**: 50 GB (adjustable)
-8. Deploy
+7. Deploy
 
 ### 2. Frontend (Vercel)
 
@@ -119,9 +115,7 @@ If you see CORS errors in the browser console:
 
 ### Downloads Not Persisting
 
-1. Check that the Render persistent disk is mounted at `/mnt/data`
-2. Verify the disk size isn't full
-3. Check Render logs for any storage errors
+This is expected on Render free tier. Downloads are temporary and cleared on restart. For persistent storage, upgrade to a paid Render plan.
 
 ### API Unreachable
 

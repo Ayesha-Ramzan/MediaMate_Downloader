@@ -109,7 +109,7 @@ npm run dev
 ENVIRONMENT=production
 PORT=8000
 ALLOWED_ORIGINS=https://your-frontend.vercel.app
-BASE_DIR=/mnt/data/mediamate
+BASE_DIR=/tmp/mediamate
 ```
 
 **Frontend (Vercel environment):**
@@ -121,10 +121,9 @@ See `.env.example` for all available options.
 
 ## 📁 Storage
 
-- **Development**: `/tmp/Downloader` (ephemeral)
-- **Production (Render)**: `/mnt/data/mediamate` (persistent disk)
+- **All environments**: `/tmp/mediamate` (ephemeral — cleared on restart)
 
-Files persist across server restarts when using Render's persistent disk.
+Files are temporary and do not persist across server restarts.
 
 ## 🗄️ Job Persistence
 
@@ -166,7 +165,7 @@ Wildcard domains are not allowed with credentials for security.
 Add your Vercel URL to `ALLOWED_ORIGINS` on Render and restart the service.
 
 ### Downloads Not Persisting
-Ensure Render persistent disk is mounted at `/mnt/data` and has available space.
+This is expected behavior on Render free tier. Downloads are temporary and cleared on restart. For persistent storage, upgrade to a paid Render plan and use persistent disk volumes.
 
 ### Format Not Available
 Update yt-dlp: `POST /api/update-ytdlp` or `pip install --upgrade yt-dlp`

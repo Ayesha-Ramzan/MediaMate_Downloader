@@ -70,30 +70,25 @@ app.add_middleware(
 # ─────────────────────────────────────────────
 #  DIRECTORIES
 #  Storage location is configurable via BASE_DIR env var.
-#  On Render, use the persistent disk volume (/mnt/data).
-#  Defaults to /tmp for local development/HF Spaces.
+#  On Render (free tier), uses /tmp/mediamate (ephemeral).
 # ─────────────────────────────────────────────
 def get_base_dir() -> Path:
     if os.environ.get("ENVIRONMENT") == "production":
-        # Render persistent disk
-        base = Path("/mnt/data/mediamate") if Path("/mnt/data").exists() else Path("/tmp/Downloader")
+        base = Path(os.environ.get("BASE_DIR", "/tmp/mediamate"))
     else:
-        base = Path(os.environ.get("BASE_DIR", "/tmp/Downloader"))
+        base = Path(os.environ.get("BASE_DIR", "/tmp/mediamate"))
     return base
 
 BASE_DIR      = get_base_dir()
-DOWNLOADS_DIR = BASE_DIR / "Downloads"   # everything (video/audio/images/converted) lands here
-UPLOADS_DIR   = BASE_DIR / "Uploads"     # temp storage for files the user uploads (not shown to user)
-JOBS_DB_DIR   = BASE_DIR / "jobs_db"     # persistent job store
+DOWNLOADS_DIR = BASE_DIR / "Downloads"
+UPLOADS_DIR   = BASE_DIR / "Uploads"
 
-# Kept as aliases so nothing downstream needs to guess which constant to use —
-# they all point at the same single folder now, no more splitting by type.
 VIDEOS_DIR    = DOWNLOADS_DIR
 MUSIC_DIR     = DOWNLOADS_DIR
 IMAGES_DIR    = DOWNLOADS_DIR
 CONVERTED_DIR = DOWNLOADS_DIR
 
-for d in [DOWNLOADS_DIR, UPLOADS_DIR, JOBS_DB_DIR]:
+for d in [DOWNLOADS_DIR, UPLOADS_DIR]:
     d.mkdir(parents=True, exist_ok=True)
 
 logger.info(f"Storage base directory: {BASE_DIR}")
@@ -127,9 +122,9 @@ except Exception:
     logger.warning("Could not determine yt-dlp version at startup")
 
 # ─────────────────────────────────────────────
-#  PERSISTENT JOB STORE
-#  Jobs are stored as JSON files to survive restarts.
-#  Still enforces TTL and max job count cleanup.
+#  IN-MEMORY JOB STORE
+#  Jobs live only as long as the process does.
+#  No persistence — jobs are lost on restart.
 # ─────────────────────────────────────────────
 jobs: dict = {}
 
@@ -139,44 +134,8 @@ MAX_JOBS        = 200           # hard ceiling regardless of age
 TERMINAL_STATUSES = {"done", "error", "cancelled"}
 
 
-def _load_jobs_from_disk() -> dict:
-    """Load all jobs from disk into memory on startup."""
-    loaded = {}
-    if not JOBS_DB_DIR.exists():
-        return loaded
-
-    for job_file in JOBS_DB_DIR.glob("*.json"):
-        try:
-            with open(job_file) as f:
-                job = json.load(f)
-                loaded[job.get("id")] = job
-        except (json.JSONDecodeError, IOError) as e:
-            logger.warning(f"Failed to load job from {job_file}: {e}")
-
-    return loaded
-
-
-def _save_job_to_disk(job_id: str, job_data: dict) -> None:
-    """Persist a single job to disk."""
-    try:
-        job_file = JOBS_DB_DIR / f"{job_id}.json"
-        with open(job_file, "w") as f:
-            json.dump(job_data, f)
-    except IOError as e:
-        logger.warning(f"Failed to save job {job_id} to disk: {e}")
-
-
-def _delete_job_file(job_id: str) -> None:
-    """Delete a job file from disk."""
-    try:
-        job_file = JOBS_DB_DIR / f"{job_id}.json"
-        job_file.unlink(missing_ok=True)
-    except IOError as e:
-        logger.warning(f"Failed to delete job file {job_id}: {e}")
-
-
 def cleanup_old_jobs() -> None:
-    """Evict stale terminal jobs. Called opportunistically on job creation."""
+    """Evict stale terminal jobs."""
     now = datetime.now(timezone.utc)
     stale_ids = []
 
@@ -194,7 +153,6 @@ def cleanup_old_jobs() -> None:
             stale_ids.append(jid)
 
     for jid in stale_ids:
-        _delete_job_file(jid)
         jobs.pop(jid, None)
 
     if len(jobs) > MAX_JOBS:
@@ -204,14 +162,7 @@ def cleanup_old_jobs() -> None:
             key=lambda j: j.get("created_at", ""),
         )
         for j in oldest_terminal[:overflow]:
-            job_id = j["id"]
-            _delete_job_file(job_id)
-            jobs.pop(job_id, None)
-
-
-# Load jobs from disk on startup
-jobs = _load_jobs_from_disk()
-logger.info(f"Loaded {len(jobs)} jobs from disk")
+            jobs.pop(j["id"], None)
 
 
 # ─────────────────────────────────────────────
@@ -410,14 +361,12 @@ def create_job(type_: str = "video") -> str:
         "message": "Starting...",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
-    _save_job_to_disk(job_id, jobs[job_id])
     return job_id
 
 
 def update_job(job_id: str, **kwargs):
     if job_id in jobs:
         jobs[job_id].update(kwargs)
-        _save_job_to_disk(job_id, jobs[job_id])
 
 
 # ─────────────────────────────────────────────
@@ -1288,7 +1237,6 @@ def list_jobs():
 def delete_job(job_id: str):
     if job_id not in jobs:
         raise HTTPException(404, "Job not found")
-    _delete_job_file(job_id)
     del jobs[job_id]
     return {"ok": True}
 

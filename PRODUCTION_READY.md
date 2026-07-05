@@ -4,12 +4,13 @@
 
 ### Backend (FastAPI)
 - [x] Environment variable configuration for CORS origins
-- [x] Dynamic BASE_DIR selection (production: /mnt/data/mediamate, dev: /tmp/Downloader)
-- [x] Persistent job store (JSON file-based, survives server restarts)
+- [x] Dynamic BASE_DIR selection (uses /tmp/mediamate on all tiers)
+- [x] In-memory job store (jobs lost on restart)
 - [x] Job cleanup with TTL (2 hours) and max job limits
 - [x] Removed static frontend serving (now separate deployment)
 - [x] Updated port handling (Render uses PORT env var)
 - [x] Proper logging of configuration at startup
+- [x] Free tier compatible (no persistent disk required)
 
 ### Frontend
 - [x] Configurable API endpoint via REACT_APP_API_BASE env var

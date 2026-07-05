@@ -1,17 +1,13 @@
 services:
   - type: web
     name: mediamate-backend
-    runtime: python
-    buildCommand: pip install -r requirements.txt
-    startCommand: python app.py
+    runtime: docker
+    plan: free
     envVars:
       - key: ENVIRONMENT
         value: production
-      - key: PORT
-        value: 8000
       - key: ALLOWED_ORIGINS
-        scope: run
+        sync: false
       - key: BASE_DIR
         value: /tmp/mediamate
     healthCheckPath: /api/info
-

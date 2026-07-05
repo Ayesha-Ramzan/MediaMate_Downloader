@@ -2,7 +2,19 @@ __pycache__/
 *.pyc
 myenv/
 .env
+.env.local
 cookies.txt
 cookies_b64.txt
+*.log
 
-# myenv\Scripts\uvicorn.exe app:app --port 8000 --reload
+# Frontend
+node_modules/
+dist/
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Render/Vercel
+.vercel/
+build/

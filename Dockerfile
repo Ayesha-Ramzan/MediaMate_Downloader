@@ -1,21 +1,28 @@
-# Use the official lightweight Python image
-FROM python:3.10-slim
+# Use Python 3.11 slim image
+FROM python:3.11-slim
 
-# Install system dependencies (FFmpeg required by your backend)
+WORKDIR /app
+
+# Install system dependencies required by yt-dlp and ffmpeg
 RUN apt-get update && apt-get install -y \
     ffmpeg \
-    git \
+    ffprobe \
     && rm -rf /var/lib/apt/lists/*
 
-# Set the working directory inside the container
-WORKDIR /code
+# Copy requirements
+COPY requirements.txt .
 
-# Copy requirements and install Python dependencies
-COPY ./requirements.txt /code/requirements.txt
-RUN pip install --no-cache-dir --upgrade -r /code/requirements.txt
+# Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
-COPY . .
+# Copy app
+COPY app.py .
 
-# Hugging Face Spaces listens on port 7860 by default
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "7860"]
+# Create persistent volume mount point
+RUN mkdir -p /mnt/data
+
+# Expose port (Render will set PORT env var)
+EXPOSE 8000
+
+# Run the app
+CMD ["python", "app.py"]

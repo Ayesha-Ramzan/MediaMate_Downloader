@@ -1,0 +1,13 @@
+{
+  "name": "mediamate-downloader-frontend",
+  "version": "2.2.0",
+  "description": "MediaMate Downloader - Frontend",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "python -m http.server 3000",
+    "start": "python -m http.server 3000"
+  },
+  "keywords": ["downloader", "video", "mediamate"],
+  "author": "",
+  "license": "MIT"
+}

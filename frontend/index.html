@@ -1514,10 +1514,21 @@
 
     /* ─────────────────────────────────────────────
        CONFIG
+       API_BASE is injected by the build process via environment variable.
+       Local development defaults to "" (same origin), production uses
+       the full Render backend URL.
     ───────────────────────────────────────────── */
-   const HF_BACKEND = "https://mediamate-downloader.onrender.com";
-    const IS_LOCAL   = location.hostname === "localhost" || location.hostname === "127.0.0.1";
-    const API_BASE   = IS_LOCAL ? "" : HF_BACKEND;
+    // This will be replaced by the build script with the actual API URL
+    const API_BASE = "{{API_BASE_URL}}";
+
+    // Fallback if API_BASE wasn't replaced by build script
+    // (for development without build step)
+    let finalApiBase = API_BASE;
+    if (finalApiBase === "{{API_BASE_URL}}" || !finalApiBase) {
+      const IS_LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1";
+      finalApiBase = IS_LOCAL ? "" : window.location.origin;
+    }
+    const API_ENDPOINT = finalApiBase;
 
 
     /* ─────────────────────────────────────────────
@@ -1808,7 +1819,7 @@
 
     function triggerBrowserDownload(jobId) {
       const a = document.createElement('a');
-      a.href = `${API_BASE}/api/download-file/${jobId}`;
+      a.href = `${API_ENDPOINT}/api/download-file/${jobId}`;
       a.setAttribute('download', '');
       document.body.appendChild(a);
       a.click();
@@ -1816,7 +1827,7 @@
     }
 
     function listenProgress(jobId, areaId, onDone) {
-      const es = new EventSource(`${API_BASE}/api/progress/${jobId}`);
+      const es = new EventSource(`${API_ENDPOINT}/api/progress/${jobId}`);
 
       es.onmessage = e => {
         const job = JSON.parse(e.data);
@@ -1900,7 +1911,7 @@
 
       try {
         showToast('Starting conversion...', 'info', 2000);
-        const res  = await fetch(API_BASE + '/api/convert', { method: 'POST', body: fd });
+        const res  = await fetch(API_ENDPOINT + '/api/convert', { method: 'POST', body: fd });
         const data = await res.json();
         if (data.job_id) listenProgress(data.job_id, 'convert-progress-area');
         else showToast(data.detail || 'Error', 'error');
@@ -2114,7 +2125,7 @@
 
     async function openFolder(path) {
       try {
-        await fetch(`${API_BASE}/api/open-folder?path=${encodeURIComponent(path)}`);
+        await fetch(`${API_ENDPOINT}/api/open-folder?path=${encodeURIComponent(path)}`);
       } catch(e) {
         showToast('Could not open folder', 'error');
       }
@@ -2188,7 +2199,7 @@
         headers: body && !(body instanceof FormData) ? { 'Content-Type': 'application/json' } : {},
         body:    body && !(body instanceof FormData) ? JSON.stringify(body) : body,
       };
-       const res  = await fetch(API_BASE + path, opts)
+       const res  = await fetch(API_ENDPOINT + path, opts)
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || data.message || 'Request failed');
       return data;

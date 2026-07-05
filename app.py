@@ -18,7 +18,6 @@ from datetime import datetime, timezone
 import yt_dlp
 from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File, Form, Request
 from fastapi.responses import JSONResponse, StreamingResponse, FileResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -40,14 +39,24 @@ logger = logging.getLogger("mediamate")
 app = FastAPI(title="Video Downloader API", version="2.2.0")
 
 # ── CORS ──────────────────────────────────────
-# Add your Vercel URL(s) here. Wildcards are not
-# allowed with credentials, so list them explicitly.
-ALLOWED_ORIGINS = [
-    "https://media-mate-downloader.vercel.app",
-    "http://localhost:3000",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-]
+# CORS origins are configurable via environment variable.
+# Format: comma-separated list of origins (e.g., "https://example.com,http://localhost:3000")
+# Defaults include localhost for local development.
+def get_allowed_origins() -> List[str]:
+    env_origins = os.environ.get("ALLOWED_ORIGINS", "")
+    default_origins = [
+        "http://localhost:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:8000",
+    ]
+
+    if env_origins:
+        return [origin.strip() for origin in env_origins.split(",")]
+    return default_origins
+
+ALLOWED_ORIGINS = get_allowed_origins()
+logger.info(f"CORS allowed origins: {ALLOWED_ORIGINS}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -60,12 +69,22 @@ app.add_middleware(
 
 # ─────────────────────────────────────────────
 #  DIRECTORIES
-#  On HF Spaces the home dir is /root or /home/user.
-#  We use /tmp for safety — it's always writable.
+#  Storage location is configurable via BASE_DIR env var.
+#  On Render, use the persistent disk volume (/mnt/data).
+#  Defaults to /tmp for local development/HF Spaces.
 # ─────────────────────────────────────────────
-BASE_DIR      = Path("/tmp/Downloader")
+def get_base_dir() -> Path:
+    if os.environ.get("ENVIRONMENT") == "production":
+        # Render persistent disk
+        base = Path("/mnt/data/mediamate") if Path("/mnt/data").exists() else Path("/tmp/Downloader")
+    else:
+        base = Path(os.environ.get("BASE_DIR", "/tmp/Downloader"))
+    return base
+
+BASE_DIR      = get_base_dir()
 DOWNLOADS_DIR = BASE_DIR / "Downloads"   # everything (video/audio/images/converted) lands here
 UPLOADS_DIR   = BASE_DIR / "Uploads"     # temp storage for files the user uploads (not shown to user)
+JOBS_DB_DIR   = BASE_DIR / "jobs_db"     # persistent job store
 
 # Kept as aliases so nothing downstream needs to guess which constant to use —
 # they all point at the same single folder now, no more splitting by type.
@@ -74,8 +93,10 @@ MUSIC_DIR     = DOWNLOADS_DIR
 IMAGES_DIR    = DOWNLOADS_DIR
 CONVERTED_DIR = DOWNLOADS_DIR
 
-for d in [DOWNLOADS_DIR, UPLOADS_DIR]:
+for d in [DOWNLOADS_DIR, UPLOADS_DIR, JOBS_DB_DIR]:
     d.mkdir(parents=True, exist_ok=True)
+
+logger.info(f"Storage base directory: {BASE_DIR}")
 
 # ─────────────────────────────────────────────
 #  YOUTUBE COOKIES (Render Secret File)
@@ -106,12 +127,9 @@ except Exception:
     logger.warning("Could not determine yt-dlp version at startup")
 
 # ─────────────────────────────────────────────
-#  IN-MEMORY JOB STORE
-#  No persistence layer here — jobs live only as long as the process does,
-#  by design (this is a single-instance local/HF-Spaces app, not a
-#  multi-worker deployment). But unbounded growth within that lifetime is
-#  still a real leak, so we sweep terminal (done/error/cancelled) jobs
-#  that are older than JOB_TTL_SECONDS, and hard-cap total job count.
+#  PERSISTENT JOB STORE
+#  Jobs are stored as JSON files to survive restarts.
+#  Still enforces TTL and max job count cleanup.
 # ─────────────────────────────────────────────
 jobs: dict = {}
 
@@ -121,10 +139,44 @@ MAX_JOBS        = 200           # hard ceiling regardless of age
 TERMINAL_STATUSES = {"done", "error", "cancelled"}
 
 
+def _load_jobs_from_disk() -> dict:
+    """Load all jobs from disk into memory on startup."""
+    loaded = {}
+    if not JOBS_DB_DIR.exists():
+        return loaded
+
+    for job_file in JOBS_DB_DIR.glob("*.json"):
+        try:
+            with open(job_file) as f:
+                job = json.load(f)
+                loaded[job.get("id")] = job
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"Failed to load job from {job_file}: {e}")
+
+    return loaded
+
+
+def _save_job_to_disk(job_id: str, job_data: dict) -> None:
+    """Persist a single job to disk."""
+    try:
+        job_file = JOBS_DB_DIR / f"{job_id}.json"
+        with open(job_file, "w") as f:
+            json.dump(job_data, f)
+    except IOError as e:
+        logger.warning(f"Failed to save job {job_id} to disk: {e}")
+
+
+def _delete_job_file(job_id: str) -> None:
+    """Delete a job file from disk."""
+    try:
+        job_file = JOBS_DB_DIR / f"{job_id}.json"
+        job_file.unlink(missing_ok=True)
+    except IOError as e:
+        logger.warning(f"Failed to delete job file {job_id}: {e}")
+
+
 def cleanup_old_jobs() -> None:
-    """Evict stale terminal jobs. Called opportunistically on job creation
-    rather than on a background timer — simplest option for an in-memory
-    dict with no persistence, and cheap enough (O(n) over a capped n)."""
+    """Evict stale terminal jobs. Called opportunistically on job creation."""
     now = datetime.now(timezone.utc)
     stale_ids = []
 
@@ -142,6 +194,7 @@ def cleanup_old_jobs() -> None:
             stale_ids.append(jid)
 
     for jid in stale_ids:
+        _delete_job_file(jid)
         jobs.pop(jid, None)
 
     if len(jobs) > MAX_JOBS:
@@ -151,7 +204,14 @@ def cleanup_old_jobs() -> None:
             key=lambda j: j.get("created_at", ""),
         )
         for j in oldest_terminal[:overflow]:
-            jobs.pop(j["id"], None)
+            job_id = j["id"]
+            _delete_job_file(job_id)
+            jobs.pop(job_id, None)
+
+
+# Load jobs from disk on startup
+jobs = _load_jobs_from_disk()
+logger.info(f"Loaded {len(jobs)} jobs from disk")
 
 
 # ─────────────────────────────────────────────
@@ -350,12 +410,14 @@ def create_job(type_: str = "video") -> str:
         "message": "Starting...",
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
+    _save_job_to_disk(job_id, jobs[job_id])
     return job_id
 
 
 def update_job(job_id: str, **kwargs):
     if job_id in jobs:
         jobs[job_id].update(kwargs)
+        _save_job_to_disk(job_id, jobs[job_id])
 
 
 # ─────────────────────────────────────────────
@@ -1226,24 +1288,19 @@ def list_jobs():
 def delete_job(job_id: str):
     if job_id not in jobs:
         raise HTTPException(404, "Job not found")
+    _delete_job_file(job_id)
     del jobs[job_id]
     return {"ok": True}
 
 
-# ─────────────────────────────────────────────
-#  STATIC FRONTEND (optional — only if bundled)
-# ─────────────────────────────────────────────
-@app.get("/")
-async def serve_frontend():
-    return FileResponse(Path(__file__).parent / "frontend" / "index.html")
-
 
 # ─────────────────────────────────────────────
 #  ENTRYPOINT
-#  Hugging Face Spaces requires port 7860.
-#  Local dev uses 8000.
+#  Render uses the PORT environment variable.
+#  Local dev can use any port (defaults to 8000).
 # ─────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
-    port = int(os.environ.get("PORT", 7860))
-    uvicorn.run("app:app", host="0.0.0.0", port=port, reload=False)
+    port = int(os.environ.get("PORT", 8000))
+    host = os.environ.get("HOST", "0.0.0.0")
+    uvicorn.run("app:app", host=host, port=port, reload=False)

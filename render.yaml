@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: mediamate-backend
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: PORT
+        value: 8000
+      - key: ALLOWED_ORIGINS
+        scope: run
+      - key: BASE_DIR
+        value: /mnt/data/mediamate
+    disk:
+      name: mediamate-storage
+      mountPath: /mnt/data
+      sizeGB: 50
+    healthCheckPath: /api/info

@@ -2,7 +2,7 @@
 
 A full-stack application for downloading media from YouTube, TikTok, Instagram, and other platforms. Production-ready for deployment on Vercel (frontend) and Render (backend).
 
-## 🚀 Features
+##  Features
 
 - **Multi-platform Downloads**: YouTube, TikTok, Instagram, Twitter/X, Facebook, Vimeo, LinkedIn
 - **Format Support**: MP4, MP3, WebM, MKV, and more
@@ -33,7 +33,7 @@ MediaMate_Downloader/
     └── README.md         # Frontend documentation
 ```
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 **Backend:**
 - FastAPI (async Python web framework)
@@ -46,7 +46,7 @@ MediaMate_Downloader/
 - No build dependencies required for development
 - Responsive design, dark mode support
 
-## 🚀 Quick Deployment
+## Quick Deployment
 
 ### Prerequisites
 
@@ -74,7 +74,7 @@ MediaMate_Downloader/
 
 For detailed step-by-step instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md)
 
-## 💻 Local Development
+##  Local Development
 
 ### Backend
 
@@ -100,7 +100,7 @@ npm run dev
 # Frontend runs on http://localhost:3000
 ```
 
-## 🔐 Configuration
+##  Configuration
 
 ### Environment Variables
 
@@ -119,20 +119,20 @@ REACT_APP_API_BASE=https://your-backend.onrender.com
 
 See `.env.example` for all available options.
 
-## 📁 Storage
+##  Storage
 
 - **All environments**: `/tmp/mediamate` (ephemeral — cleared on restart)
 
 Files are temporary and do not persist across server restarts.
 
-## 🗄️ Job Persistence
+##  Job Persistence
 
 Jobs are now stored as JSON files and persist across server restarts:
 - Completed jobs kept for 2 hours
 - Maximum 200 jobs in store
 - Jobs directory: `{BASE_DIR}/jobs_db/`
 
-## 🔒 CORS Security
+##  CORS Security
 
 CORS origins are configurable via environment variable:
 ```
@@ -141,7 +141,7 @@ ALLOWED_ORIGINS=https://frontend.com,http://localhost:3000
 
 Wildcard domains are not allowed with credentials for security.
 
-## 📊 API Endpoints
+##  API Endpoints
 
 ### Info
 - `GET /api/info` - Server info and supported sources
@@ -159,7 +159,7 @@ Wildcard domains are not allowed with credentials for security.
 - `POST /api/video-info` - Get video metadata
 - `POST /api/update-ytdlp` - Update yt-dlp version
 
-## 🐛 Troubleshooting
+##  Troubleshooting
 
 ### CORS Errors
 Add your Vercel URL to `ALLOWED_ORIGINS` on Render and restart the service.
@@ -183,11 +183,11 @@ sudo apt-get install ffmpeg
 choco install ffmpeg
 ```
 
-## 📝 License
+##  License
 
 MIT
 
-## 🤝 Support
+##  Support
 
 For issues, check the [DEPLOYMENT.md](./DEPLOYMENT.md) troubleshooting section or review Render/Vercel logs.
 
